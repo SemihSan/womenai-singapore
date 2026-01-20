@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Women AI - Admin Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Login Screen */
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 400px;
+            margin: 100px auto;
+            display: none;
+        }
+
+        .login-box.active {
+            display: block;
+        }
+
+        .login-box h1 {
+            color: #667eea;
+            margin-bottom: 30px;
+            text-align: center;
+            font-size: 28px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .input-group input,
+        .input-group textarea,
+        .input-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus,
+        .input-group textarea:focus,
+        .input-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .input-group textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-family: 'Courier New', monospace;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            margin-top: 10px;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+        }
+
+        /* Admin Panel */
+        .admin-panel {
+            display: none;
+        }
+
+        .admin-panel.active {
+            display: block;
+        }
+
+        .header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #667eea;
+            font-size: 28px;
+        }
+
+        .header .user-info {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .logout-btn {
+            padding: 10px 20px;
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #ee5a6f;
+            transform: scale(1.05);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-card .value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .settings-grid {
+            display: grid;
+            gap: 20px;
+        }
+
+        .settings-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .settings-card h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 22px;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            display: none;
+        }
+
+        .alert.active {
+            display: block;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .blacklist-manager {
+            margin-top: 20px;
+        }
+
+        .blacklist-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+            min-height: 50px;
+            padding: 15px;
+            border: 2px dashed #e0e0e0;
+            border-radius: 10px;
+        }
+
+        .tag {
+            background: #667eea;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .tag .remove {
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        .tag .remove:hover {
+            color: #ff6b6b;
+        }
+
+        .add-blacklist {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .add-blacklist input {
+            flex: 1;
+        }
+
+        .add-blacklist button {
+            width: auto;
+            padding: 12px 30px;
+        }
+
+        .range-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .range-group input[type="range"] {
+            flex: 1;
+        }
+
+        .range-value {
+            min-width: 50px;
+            text-align: center;
+            font-weight: bold;
+            color: #667eea;
+            font-size: 18px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 18px;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+
+        .emoji {
+            font-size: 24px;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading -->
+    <div id="loading" class="loading">
+        <div>Yükleniyor...</div>
+    </div>
+
+    <!-- Login Screen -->
+    <div id="loginBox" class="login-box">
+        <h1>🔐 Admin Girişi</h1>
+        <div id="loginAlert" class="alert"></div>
+        <form id="loginForm">
+            <div class="input-group">
+                <label for="username">Kullanıcı Adı</label>
+                <input type="text" id="username" required autocomplete="username">
+            </div>
+            <div class="input-group">
+                <label for="password">Şifre</label>
+                <input type="password" id="password" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn">Giriş Yap</button>
+        </form>
+    </div>
+
+    <!-- Admin Panel -->
+    <div id="adminPanel" class="admin-panel">
+        <div class="container">
+            <!-- Header -->
+            <div class="header">
+                <h1>👩‍💼 Women AI Admin Panel</h1>
+                <div class="user-info">
+                    <span id="welcomeText">Hoş geldin, Admin!</span>
+                    <button class="logout-btn" onclick="logout()">Çıkış Yap</button>
+                </div>
+            </div>
+
+            <!-- Alert -->
+            <div id="mainAlert" class="alert"></div>
+
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3><span class="emoji">💬</span>Toplam Sohbet</h3>
+                    <div class="value" id="totalChats">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3><span class="emoji">📨</span>Toplam Mesaj</h3>
+                    <div class="value" id="totalMessages">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3><span class="emoji">⏱️</span>Uptime</h3>
+                    <div class="value" id="uptime">0s</div>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="settings-grid">
+                <!-- AI Model Settings -->
+                <div class="settings-card">
+                    <h2>🤖 AI Model Ayarları</h2>
+                    <div class="form-row">
+                        <div class="input-group">
+                            <label for="model">Model</label>
+                            <select id="model">
+                                <option value="gpt-4o-mini">GPT-4o Mini (Hızlı & Ekonomik)</option>
+                                <option value="gpt-4o">GPT-4o (En İyi Performans)</option>
+                                <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo (En Ekonomik)</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="maxMessageLength">Maks. Mesaj Uzunluğu</label>
+                            <input type="number" id="maxMessageLength" min="100" max="5000" step="100">
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="temperature">Temperature (Yaratıcılık): <span class="range-value" id="tempValue">0.7</span></label>
+                        <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7" 
+                               oninput="document.getElementById('tempValue').textContent = this.value">
+                    </div>
+                    <div class="input-group">
+                        <label for="frequencyPenalty">Frequency Penalty (Tekrar Azaltma): <span class="range-value" id="freqValue">0</span></label>
+                        <input type="range" id="frequencyPenalty" min="-2" max="2" step="0.1" value="0" 
+                               oninput="document.getElementById('freqValue').textContent = this.value">
+                        <small style="color: #666; display: block; margin-top: 5px;">Aynı kelimelerin/ürünlerin tekrar edilmesini azaltır (önerilen: 0.3-0.5)</small>
+                    </div>
+                    <div class="input-group">
+                        <label for="presencePenalty">Presence Penalty (Yeni Konulara Geçiş): <span class="range-value" id="presValue">0</span></label>
+                        <input type="range" id="presencePenalty" min="-2" max="2" step="0.1" value="0" 
+                               oninput="document.getElementById('presValue').textContent = this.value">
+                        <small style="color: #666; display: block; margin-top: 5px;">Yeni konuları keşfetmeyi teşvik eder, aynı noktada takılmayı önler (önerilen: 0.3-0.5)</small>
+                    </div>
+                    <div class="input-group">
+                        <label for="topP">Top P (Çeşitlilik Kontrolü): <span class="range-value" id="topPValue">1</span></label>
+                        <input type="range" id="topP" min="0" max="1" step="0.05" value="1" 
+                               oninput="document.getElementById('topPValue').textContent = this.value">
+                        <small style="color: #666; display: block; margin-top: 5px;">Temperature ile birlikte kullanılmaz, genelde varsayılan 1'de bırakılır</small>
+                    </div>
+                    <div class="input-group">
+                        <label for="maxTokens">Max Tokens (Maksimum Yanıt Uzunluğu)</label>
+                        <input type="number" id="maxTokens" min="0" max="4000" step="50" placeholder="Boş = Sınırsız">
+                        <small style="color: #666; display: block; margin-top: 5px;">Yanıtın maksimum token sayısı (önerilen: 500-1000, boş bırakılırsa sınırsız)</small>
+                    </div>
+                </div>
+
+                <!-- System Prompt -->
+                <div class="settings-card">
+                    <h2>🧠 Ana Sistem Promptu</h2>
+                    <div class="input-group">
+                        <label for="systemPrompt">AI'ın genel kişiliği ve davranış kuralları</label>
+                        <textarea id="systemPrompt" rows="8"></textarea>
+                    </div>
+                </div>
+
+                <!-- Mode Prompts -->
+                <div class="settings-card">
+                    <h2>🎭 Mod Promptları</h2>
+                    <div class="input-group">
+                        <label for="carePrompt">🧴 Bakım Modu</label>
+                        <textarea id="carePrompt" rows="3"></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label for="motivationPrompt">💪 Motivasyon Modu</label>
+                        <textarea id="motivationPrompt" rows="3"></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label for="dietPrompt">🥗 Beslenme Modu</label>
+                        <textarea id="dietPrompt" rows="3"></textarea>
+                    </div>
+                </div>
+
+                <!-- Blacklist -->
+                <div class="settings-card">
+                    <h2>🚫 Kara Liste (Yasaklı Kelimeler)</h2>
+                    <div class="blacklist-manager">
+                        <div class="blacklist-tags" id="blacklistTags"></div>
+                        <div class="add-blacklist">
+                            <input type="text" id="newBlacklistWord" placeholder="Yeni kelime ekle...">
+                            <button class="btn" onclick="addBlacklistWord()">Ekle</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Save Button -->
+                <div class="settings-card">
+                    <button class="btn" onclick="saveSettings()">💾 Ayarları Kaydet</button>
+                    <button class="btn btn-secondary" onclick="loadSettings()">🔄 Ayarları Yenile</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let token = localStorage.getItem('adminToken');
+        let currentSettings = null;
+
+        // Init
+        window.onload = () => {
+            document.getElementById('loading').style.display = 'none';
+            if (token) {
+                showAdminPanel();
+            } else {
+                showLogin();
+            }
+        };
+
+        function showLogin() {
+            document.getElementById('loginBox').classList.add('active');
+            document.getElementById('adminPanel').classList.remove('active');
+        }
+
+        function showAdminPanel() {
+            document.getElementById('loginBox').classList.remove('active');
+            document.getElementById('adminPanel').classList.add('active');
+            loadStats();
+            loadSettings();
+        }
+
+        function showAlert(message, type = 'success', elementId = 'mainAlert') {
+            const alert = document.getElementById(elementId);
+            alert.textContent = message;
+            alert.className = `alert ${type === 'success' ? 'alert-success' : 'alert-error'} active`;
+            setTimeout(() => alert.classList.remove('active'), 5000);
+        }
+
+        // Login
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const res = await fetch('/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    token = data.token;
+                    localStorage.setItem('adminToken', token);
+                    showAdminPanel();
+                } else {
+                    showAlert(data.error || 'Giriş başarısız', 'error', 'loginAlert');
+                }
+            } catch (err) {
+                showAlert('Bağlantı hatası: ' + err.message, 'error', 'loginAlert');
+            }
+        });
+
+        // Logout
+        async function logout() {
+            try {
+                await fetch('/admin/logout', {
+                    method: 'POST',
+                    headers: { 'x-admin-token': token }
+                });
+            } catch (err) {
+                console.error('Logout error:', err);
+            }
+            token = null;
+            localStorage.removeItem('adminToken');
+            showLogin();
+        }
+
+        // Load Stats
+        async function loadStats() {
+            try {
+                const res = await fetch('/admin/stats', {
+                    headers: { 'x-admin-token': token }
+                });
+
+                if (res.status === 401) {
+                    logout();
+                    return;
+                }
+
+                const data = await res.json();
+                document.getElementById('totalChats').textContent = data.totalChats;
+                document.getElementById('totalMessages').textContent = data.totalMessages;
+                document.getElementById('uptime').textContent = formatUptime(data.uptime);
+            } catch (err) {
+                console.error('Stats error:', err);
+            }
+        }
+
+        function formatUptime(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            return `${hours}s ${minutes}d`;
+        }
+
+        // Load Settings
+        async function loadSettings() {
+            try {
+                const res = await fetch('/admin/settings', {
+                    headers: { 'x-admin-token': token }
+                });
+
+                if (res.status === 401) {
+                    logout();
+                    return;
+                }
+
+                currentSettings = await res.json();
+
+                // Populate form
+                document.getElementById('systemPrompt').value = currentSettings.systemPrompt || '';
+                document.getElementById('carePrompt').value = currentSettings.carePrompt || '';
+                document.getElementById('motivationPrompt').value = currentSettings.motivationPrompt || '';
+                document.getElementById('dietPrompt').value = currentSettings.dietPrompt || '';
+                document.getElementById('temperature').value = currentSettings.temperature || 0.4;
+                document.getElementById('tempValue').textContent = currentSettings.temperature || 0.4;
+                document.getElementById('model').value = currentSettings.model || 'gpt-4o-mini';
+                document.getElementById('maxMessageLength').value = currentSettings.maxMessageLength || 1000;
+                
+                // Yeni parametreler
+                document.getElementById('frequencyPenalty').value = currentSettings.frequencyPenalty || 0;
+                document.getElementById('freqValue').textContent = currentSettings.frequencyPenalty || 0;
+                document.getElementById('presencePenalty').value = currentSettings.presencePenalty || 0;
+                document.getElementById('presValue').textContent = currentSettings.presencePenalty || 0;
+                document.getElementById('topP').value = currentSettings.topP !== undefined ? currentSettings.topP : 1;
+                document.getElementById('topPValue').textContent = currentSettings.topP !== undefined ? currentSettings.topP : 1;
+                document.getElementById('maxTokens').value = currentSettings.maxTokens || '';
+
+                // Render blacklist
+                renderBlacklist(currentSettings.blacklist || []);
+
+                showAlert('Ayarlar yüklendi', 'success');
+            } catch (err) {
+                showAlert('Ayarlar yüklenirken hata: ' + err.message, 'error');
+            }
+        }
+
+        // Save Settings
+        async function saveSettings() {
+            const maxTokensValue = document.getElementById('maxTokens').value;
+            
+            const settings = {
+                systemPrompt: document.getElementById('systemPrompt').value,
+                carePrompt: document.getElementById('carePrompt').value,
+                motivationPrompt: document.getElementById('motivationPrompt').value,
+                dietPrompt: document.getElementById('dietPrompt').value,
+                temperature: parseFloat(document.getElementById('temperature').value),
+                model: document.getElementById('model').value,
+                maxMessageLength: parseInt(document.getElementById('maxMessageLength').value),
+                blacklist: currentSettings ? currentSettings.blacklist : [],
+                frequencyPenalty: parseFloat(document.getElementById('frequencyPenalty').value),
+                presencePenalty: parseFloat(document.getElementById('presencePenalty').value),
+                topP: parseFloat(document.getElementById('topP').value),
+                maxTokens: maxTokensValue ? parseInt(maxTokensValue) : null
+            };
+
+            try {
+                const res = await fetch('/admin/settings', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-admin-token': token
+                    },
+                    body: JSON.stringify(settings)
+                });
+
+                if (res.status === 401) {
+                    logout();
+                    return;
+                }
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    showAlert('✅ Ayarlar başarıyla kaydedildi!', 'success');
+                    currentSettings = data.settings;
+                } else {
+                    showAlert('Hata: ' + data.error, 'error');
+                }
+            } catch (err) {
+                showAlert('Kayıt hatası: ' + err.message, 'error');
+            }
+        }
+
+        // Blacklist Management
+        function renderBlacklist(blacklist) {
+            const container = document.getElementById('blacklistTags');
+            container.innerHTML = '';
+
+            if (!blacklist || blacklist.length === 0) {
+                container.innerHTML = '<div style="color: #999; padding: 10px;">Henüz kara listede kelime yok</div>';
+                return;
+            }
+
+            blacklist.forEach((word, index) => {
+                const tag = document.createElement('div');
+                tag.className = 'tag';
+                tag.innerHTML = `
+                    <span>${word}</span>
+                    <span class="remove" onclick="removeBlacklistWord(${index})">×</span>
+                `;
+                container.appendChild(tag);
+            });
+        }
+
+        function addBlacklistWord() {
+            const input = document.getElementById('newBlacklistWord');
+            const word = input.value.trim();
+
+            if (!word) return;
+
+            if (!currentSettings.blacklist) {
+                currentSettings.blacklist = [];
+            }
+
+            if (currentSettings.blacklist.includes(word)) {
+                showAlert('Bu kelime zaten listede', 'error');
+                return;
+            }
+
+            currentSettings.blacklist.push(word);
+            renderBlacklist(currentSettings.blacklist);
+            input.value = '';
+            showAlert(`"${word}" kara listeye eklendi (kaydetmeyi unutma!)`, 'success');
+        }
+
+        function removeBlacklistWord(index) {
+            const word = currentSettings.blacklist[index];
+            currentSettings.blacklist.splice(index, 1);
+            renderBlacklist(currentSettings.blacklist);
+            showAlert(`"${word}" kara listeden çıkarıldı (kaydetmeyi unutma!)`, 'success');
+        }
+
+        // Enter key for blacklist
+        document.getElementById('newBlacklistWord').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addBlacklistWord();
+            }
+        });
+
+        // Auto-refresh stats every 30 seconds
+        setInterval(() => {
+            if (token && document.getElementById('adminPanel').classList.contains('active')) {
+                loadStats();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Women AI - Kadınlar İçin Yapay Zeka Asistanı</title>
+  <meta name="description" content="Cilt bakımı, beslenme, motivasyon ve daha fazlası için kişisel yapay zeka asistanınız. Women AI ile kendinize özel tavsiyeler alın.">
+  <meta name="keywords" content="kadın, yapay zeka, cilt bakımı, beslenme, motivasyon, sağlık, AI asistan">
+  <meta name="author" content="Semih Can Kadıoğlu">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://womenai.semihcankadioglu.com.tr">
+  
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://womenai.semihcankadioglu.com.tr">
+  <meta property="og:title" content="Women AI - Kadınlar İçin Yapay Zeka Asistanı">
+  <meta property="og:description" content="Cilt bakımı, beslenme, motivasyon ve daha fazlası için kişisel yapay zeka asistanınız.">
+  <meta property="og:image" content="https://womenai.semihcankadioglu.com.tr/og-image.png">
+  
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Women AI - Kadınlar İçin Yapay Zeka Asistanı">
+  <meta name="twitter:description" content="Cilt bakımı, beslenme, motivasyon ve daha fazlası için kişisel yapay zeka asistanınız.">
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  
+  <!-- Theme Color -->
+  <meta name="theme-color" content="#7c3aed">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <div class="logo-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <span class="logo-text">Women AI</span>
+        </div>
+        <button class="new-chat-btn" id="new-chat-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>Yeni Sohbet</span>
+        </button>
+      </div>
+
+      <div class="sidebar-content">
+        <!-- Chat History -->
+        <div class="sidebar-section">
+          <div class="section-title">Sohbet Geçmişi</div>
+          <div class="chat-list" id="chat-history">
+            <div class="chat-list-empty">Henüz sohbet yok</div>
+          </div>
+        </div>
+
+        <!-- Mode Selection -->
+        <div class="sidebar-section">
+          <div class="section-title">Mod Seçimi</div>
+          <div class="mode-buttons">
+            <button class="mode-btn active" data-mode="care">
+              <span class="mode-icon">🍃</span>
+              <span>Bakım</span>
+            </button>
+            <button class="mode-btn" data-mode="motivation">
+              <span class="mode-icon">💫</span>
+              <span>Motivasyon</span>
+            </button>
+            <button class="mode-btn" data-mode="diet">
+              <span class="mode-icon">🥗</span>
+              <span>Beslenme</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Weather Card -->
+        <div class="weather-card" id="weather-card">
+          <div class="weather-card-icon">🌤️</div>
+          <div class="weather-card-info">
+            <div class="weather-card-title">Hava & Cilt Analizi</div>
+            <div class="weather-card-desc">Bugüne özel bakım önerileri</div>
+          </div>
+          <svg class="weather-card-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="theme-toggle" id="theme-toggle">
+          <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg class="theme-icon moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+          <span class="theme-text">Tema</span>
+        </button>
+        <button class="clear-btn" id="clear-history">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          <span>Geçmişi Temizle</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Chat Area -->
+    <main class="main-content">
+      <div class="chat-container">
+        <!-- Welcome Screen -->
+        <div class="welcome-screen" id="welcome-screen">
+          <div class="welcome-icon">💜</div>
+          <h1 class="welcome-title">Kadın AI Asistanı</h1>
+          <p class="welcome-subtitle">Cilt bakımı, beslenme, motivasyon ve daha fazlası için kişisel yapay zeka asistanın</p>
+          <div class="quick-actions">
+            <button class="quick-action-btn" data-prompt="Cildim için günlük bakım rutini önerir misin?">
+              <span class="quick-icon">💆‍♀️</span>
+              <span>Cilt Bakımı</span>
+            </button>
+            <button class="quick-action-btn" data-prompt="Bugün enerjimi artırmak için ne yapabilirim?">
+              <span class="quick-icon">⚡</span>
+              <span>Enerji</span>
+            </button>
+            <button class="quick-action-btn" data-prompt="Sağlıklı beslenme önerilerin nelerdir?">
+              <span class="quick-icon">🥗</span>
+              <span>Beslenme</span>
+            </button>
+            <button class="quick-action-btn" data-prompt="Kendimi daha iyi hissetmek için motivasyon önerilerin var mı?">
+              <span class="quick-icon">✨</span>
+              <span>Motivasyon</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat Messages -->
+        <div class="chat-messages" id="chat-messages"></div>
+
+        <!-- Input Area -->
+        <div class="input-container">
+          <div class="input-wrapper">
+            <textarea 
+              id="chat-input" 
+              placeholder="Mesajını yaz..." 
+              rows="1"
+              autofocus
+            ></textarea>
+            <button class="send-btn" id="chat-send">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </div>
+          <div class="input-hint">Women AI yanılabilir. Önemli bilgileri doğrulamayı unutma.</div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Weather Modal -->
+    <div class="modal-overlay" id="weather-modal-overlay">
+      <div class="modal" id="weather-modal">
+        <div class="modal-header">
+          <h2 class="modal-title">Hava & Cilt Analizi</h2>
+          <button class="modal-close" id="weather-modal-close">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="weather-info">
+            <div class="weather-main">
+              <span class="weather-icon" id="weather-header-icon">🌤️</span>
+              <div class="weather-details">
+                <div class="weather-location" id="weather-location">Konum alınıyor...</div>
+                <div class="weather-date" id="weather-date"></div>
+              </div>
+            </div>
+            <div class="weather-stats" id="weather-stats"></div>
+          </div>
+          <div class="weather-analysis">
+            <h3 class="analysis-title">✨ Bugün İçin Cilt Bakım Önerileri</h3>
+            <div class="analysis-content" id="weather-analysis-content">Yükleniyor...</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn secondary" id="weather-refresh">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+            </svg>
+            Yenile
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>
