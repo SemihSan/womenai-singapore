@@ -53,6 +53,8 @@
     const allowedOrigins = [
       'https://womenai.semihcankadioglu.com.tr',
       'https://www.womenai.semihcankadioglu.com.tr',
+      'https://singapur.semihcankadioglu.com.tr',
+      'https://www.singapur.semihcankadioglu.com.tr',
     ];
 
     app.use((req, res, next) => {
