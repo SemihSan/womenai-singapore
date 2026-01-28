@@ -58,7 +58,9 @@ async function handleGoogleSignIn(response) {
       }
       
       updateUserUI();
-      loadChatHistory(); // Sohbetleri yeniden yükle
+      updateLoginState(); // Chat alanını göster
+      await loadChatHistory(); // Sohbetleri yeniden yükle
+      await startNewChat(); // Yeni sohbet başlat
       console.log('✅ Google ile giriş başarılı:', data.user.name);
     } else {
       console.error('Google giriş hatası:', data.error);
@@ -91,8 +93,37 @@ function handleGoogleSignOut() {
   currentUser = null;
   localStorage.removeItem('womenai_user');
   updateUserUI();
-  loadChatHistory(); // Misafir olarak sohbetleri yükle
+  updateLoginState(); // Giriş ekranını göster
   console.log('✅ Çıkış yapıldı');
+}
+
+// Giriş durumuna göre ekranları göster/gizle
+function updateLoginState() {
+  const loginScreen = document.getElementById('login-screen');
+  const chatContainer = document.getElementById('chat-container');
+  const sidebar = document.getElementById('sidebar');
+  const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+  const mainContent = document.querySelector('.main-content');
+
+  if (currentUser) {
+    // Giriş yapılmış - chat alanını göster
+    if (loginScreen) loginScreen.style.display = 'none';
+    if (chatContainer) chatContainer.style.display = 'flex';
+    if (sidebar) sidebar.classList.remove('login-required');
+    if (mobileMenuToggle) {
+      mobileMenuToggle.classList.remove('hidden');
+    }
+    if (mainContent) mainContent.classList.remove('login-active');
+  } else {
+    // Giriş yapılmamış - login ekranını göster
+    if (loginScreen) loginScreen.style.display = 'flex';
+    if (chatContainer) chatContainer.style.display = 'none';
+    if (sidebar) sidebar.classList.add('login-required');
+    if (mobileMenuToggle) {
+      mobileMenuToggle.classList.add('hidden');
+    }
+    if (mainContent) mainContent.classList.add('login-active');
+  }
 }
 
 function updateUserUI() {
@@ -123,16 +154,32 @@ function initGoogleAuth() {
     try {
       currentUser = JSON.parse(savedUser);
       updateUserUI();
+      updateLoginState();
     } catch (e) {
       localStorage.removeItem('womenai_user');
+      updateLoginState();
     }
+  } else {
+    updateLoginState();
   }
 
-  // Google Sign-In butonu event listener
+  // Google Sign-In butonu event listener (sidebar'daki)
   const googleLoginBtn = document.getElementById('google-login-btn');
   if (googleLoginBtn) {
     googleLoginBtn.addEventListener('click', () => {
       // Google One Tap / Sign-In popup
+      if (window.google && window.google.accounts) {
+        google.accounts.id.prompt();
+      } else {
+        alert('Google Sign-In yüklenemedi. Sayfayı yenileyin.');
+      }
+    });
+  }
+
+  // Ana giriş ekranındaki Google butonu
+  const googleLoginBtnMain = document.getElementById('google-login-btn-main');
+  if (googleLoginBtnMain) {
+    googleLoginBtnMain.addEventListener('click', () => {
       if (window.google && window.google.accounts) {
         google.accounts.id.prompt();
       } else {
@@ -148,7 +195,6 @@ function initGoogleAuth() {
   }
 
   // Google Identity Services'ı initialize et
-  // Not: GOOGLE_CLIENT_ID server'dan alınmalı
   fetchGoogleClientId();
 }
 
@@ -698,30 +744,30 @@ async function init() {
   initTheme();
   initMobileMenu();
   initEventListeners();
-  initGoogleAuth(); // Google OAuth başlat
+  initGoogleAuth(); // Google OAuth başlat (bu updateLoginState'i de çağırır)
   
-  try {
-    await loadChatHistory();
-    // Direkt yeni sohbet başlat
-    await startNewChat();
-  } catch (error) {
-    console.error('Chat history load error:', error);
+  // Sadece giriş yapılmışsa sohbetleri yükle
+  if (currentUser) {
+    try {
+      await loadChatHistory();
+      await startNewChat();
+    } catch (error) {
+      console.error('Chat history load error:', error);
+    }
+    
+    // Input'ları aktif tut
+    setTimeout(() => {
+      if (elements.chatInput) {
+        elements.chatInput.disabled = false;
+        elements.chatInput.readOnly = false;
+      }
+      if (elements.sendBtn) {
+        elements.sendBtn.disabled = false;
+      }
+    }, 500);
   }
   
   console.log('✅ Women AI hazır!');
-  
-  // Input'ları her zaman aktif tut
-  setTimeout(() => {
-    if (elements.chatInput) {
-      elements.chatInput.disabled = false;
-      elements.chatInput.readOnly = false;
-      console.log('✅ Input aktif edildi');
-    }
-    if (elements.sendBtn) {
-      elements.sendBtn.disabled = false;
-      console.log('✅ Send button aktif edildi');
-    }
-  }, 500);
 }
 
 document.addEventListener('DOMContentLoaded', init);
