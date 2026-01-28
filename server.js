@@ -207,6 +207,21 @@
   const AdminUser = mongoose.model('AdminUser', adminUserSchema);
 
   /* =========================================================
+    2.3) User Schema (Google OAuth ile giriş yapan kullanıcılar)
+    ========================================================= */
+  const userSchema = new mongoose.Schema({
+    googleId: { type: String, required: true, unique: true },
+    email: { type: String, required: true },
+    name: { type: String, required: true },
+    picture: { type: String },
+    visitorId: { type: String }, // Eski visitor ID - geçiş için
+    createdAt: { type: Date, default: Date.now },
+    lastLogin: { type: Date, default: Date.now },
+  });
+
+  const User = mongoose.model('User', userSchema);
+
+  /* =========================================================
     3) Mini RAG - ürünler
     ========================================================= */
   const SHADLESS_PRODUCTS = [
@@ -714,7 +729,26 @@ Sen: "Mert Group'un kendi geliştirdiği yapay zeka teknolojisini kullanıyorum 
 
           // Admin ayarlarını al
           let settings = await AdminSettings.findOne();
-          if (!settings) settings = new AdminSettings();
+          if (!settings) {
+            console.log('❌ AdminSettings bulunamadı, yeni oluşturuluyor...');
+            settings = new AdminSettings({
+              systemPrompt: 'Sen kadınlara yönelik özel bir yapay zeka asistanısın.',
+              carePrompt: 'Bakım Modu: Samimi, uygulanabilir cilt bakımı önerileri.',
+              motivationPrompt: 'Motivasyon Modu: Sıcak, güçlendirici destek ver.',
+              dietPrompt: 'Beslenme Modu: Dengeli beslenme önerileri sun.',
+              model: 'gpt-4o-mini',
+              temperature: 0.7,
+              blacklist: [],
+            });
+            await settings.save();
+            console.log('✅ AdminSettings oluşturuldu');
+          }
+          
+          console.log('📝 Settings:', {
+            systemPrompt: settings.systemPrompt ? 'VAR ✅' : 'YOK ❌',
+            carePrompt: settings.carePrompt ? 'VAR ✅' : 'YOK ❌',
+            model: settings.model,
+          });
 
           // Blacklist kontrolü
           const blacklistCheck = (text, blacklist) => {
@@ -754,6 +788,12 @@ Sen: "Mert Group'un kendi geliştirdiği yapay zeka teknolojisini kullanıyorum 
             ...recentMessages,
           ].filter(Boolean);
 
+          console.log('🔍 API mesajları:', {
+            systemPrompt: apiMessages[0]?.content?.substring(0, 50) + '...',
+            modePrompt: apiMessages[1]?.content?.substring(0, 50) + '...',
+            totalMessages: apiMessages.length,
+          });
+
           // OpenAI API çağrısı
           const apiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -768,10 +808,16 @@ Sen: "Mert Group'un kendi geliştirdiği yapay zeka teknolojisini kullanıyorum 
             }),
           });
 
+          console.log('📡 OpenAI Response Status:', apiResponse.status);
+
           let reply = 'Şu anda teknik bir sorun yaşıyorum, biraz sonra tekrar dener misin?';
           if (apiResponse.ok) {
             const data = await apiResponse.json();
             reply = data.choices?.[0]?.message?.content?.trim() || reply;
+            console.log('✅ API cevapı alındı:', reply.substring(0, 100) + '...');
+          } else {
+            const errText = await apiResponse.text();
+            console.error('❌ API Hatası:', apiResponse.status, errText);
           }
 
           // AI cevabını ekle
@@ -812,6 +858,145 @@ Sen: "Mert Group'un kendi geliştirdiği yapay zeka teknolojisini kullanıyorum 
 
   // Shopify App Proxy route (Sadece Shopify'dan signature ile gelen istekler)
   app.post('/proxy/api/chat', verifyShopifyAppProxy, chatLimiter, handleChat);
+
+  /* =========================================================
+    8.1) Google OAuth API
+    ========================================================= */
+
+  // Google ile giriş yap / kayıt ol
+  app.post('/api/auth/google', async (req, res) => {
+    try {
+      const { credential } = req.body;
+      
+      if (!credential) {
+        return res.status(400).json({ error: 'Google credential gerekli' });
+      }
+
+      // Google ID token'ı doğrula
+      const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+      if (!GOOGLE_CLIENT_ID) {
+        console.error('❌ GOOGLE_CLIENT_ID tanımlı değil!');
+        return res.status(500).json({ error: 'Google OAuth yapılandırılmamış' });
+      }
+
+      // Token'ı Google'dan doğrula
+      const googleResponse = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`
+      );
+      
+      if (!googleResponse.ok) {
+        return res.status(401).json({ error: 'Geçersiz Google token' });
+      }
+
+      const payload = await googleResponse.json();
+
+      // Token'ın bizim app için olduğunu doğrula
+      if (payload.aud !== GOOGLE_CLIENT_ID) {
+        return res.status(401).json({ error: 'Token bu uygulama için değil' });
+      }
+
+      const { sub: googleId, email, name, picture } = payload;
+
+      // Kullanıcıyı bul veya oluştur
+      let user = await User.findOne({ googleId });
+      
+      if (user) {
+        // Mevcut kullanıcı - son giriş güncelle
+        user.lastLogin = new Date();
+        user.name = name;
+        user.picture = picture;
+        await user.save();
+      } else {
+        // Yeni kullanıcı
+        user = new User({
+          googleId,
+          email,
+          name,
+          picture,
+        });
+        await user.save();
+        console.log(`✅ Yeni kullanıcı kaydedildi: ${email}`);
+      }
+
+      // Kullanıcı bilgilerini döndür
+      return res.json({
+        success: true,
+        user: {
+          id: user._id,
+          googleId: user.googleId,
+          email: user.email,
+          name: user.name,
+          picture: user.picture,
+        },
+      });
+
+    } catch (err) {
+      console.error('Google auth error:', err);
+      return res.status(500).json({ error: 'Google ile giriş başarısız' });
+    }
+  });
+
+  // Eski visitor sohbetlerini Google hesabına taşı
+  app.post('/api/auth/migrate-chats', async (req, res) => {
+    try {
+      const { visitorId, googleUserId } = req.body;
+
+      if (!visitorId || !googleUserId) {
+        return res.status(400).json({ error: 'visitorId ve googleUserId gerekli' });
+      }
+
+      // Eski visitor sohbetlerini bul ve güncelle
+      const result = await Chat.updateMany(
+        { userId: visitorId },
+        { $set: { userId: `google_${googleUserId}` } }
+      );
+
+      // User'a eski visitorId'yi kaydet (referans için)
+      await User.findByIdAndUpdate(googleUserId, { visitorId });
+
+      console.log(`✅ ${result.modifiedCount} sohbet taşındı: ${visitorId} -> google_${googleUserId}`);
+
+      return res.json({
+        success: true,
+        migratedCount: result.modifiedCount,
+      });
+
+    } catch (err) {
+      console.error('Chat migration error:', err);
+      return res.status(500).json({ error: 'Sohbetler taşınamadı' });
+    }
+  });
+
+  // Kullanıcı bilgilerini getir
+  app.get('/api/auth/user/:userId', async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+      }
+
+      return res.json({
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        picture: user.picture,
+        createdAt: user.createdAt,
+      });
+
+    } catch (err) {
+      console.error('Get user error:', err);
+      return res.status(500).json({ error: 'Kullanıcı bilgileri alınamadı' });
+    }
+  });
+
+  // Frontend için config (Google Client ID vb.)
+  app.get('/api/config', (req, res) => {
+    res.json({
+      googleClientId: process.env.GOOGLE_CLIENT_ID || null,
+    });
+  });
 
   /* =========================================================
     9) SOHBET GEÇMİŞİ API - Chat History Routes (Legacy)

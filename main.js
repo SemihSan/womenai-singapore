@@ -7,16 +7,24 @@
 // Configuration
 const API_URL = '/api/chat';
 const WEATHER_URL = '/api/weather';
+const GOOGLE_CLIENT_ID = ''; // .env'den alınacak, başlangıçta boş
 
 // State
 let currentChatId = null;
 let messages = [];
 let currentMode = 'care';
+let currentUser = null; // Giriş yapmış kullanıcı
 
 // ========================================
-// USER ID MANAGEMENT (Visitor Tracking)
+// USER ID MANAGEMENT (Visitor Tracking + Google Auth)
 // ========================================
 function getUserId() {
+  // Eğer Google ile giriş yapılmışsa
+  if (currentUser && currentUser.id) {
+    return `google_${currentUser.id}`;
+  }
+  
+  // Misafir kullanıcı için visitor ID
   let visitorId = localStorage.getItem('womenai_visitor_id');
   if (!visitorId) {
     // Generate unique visitor ID
@@ -24,6 +32,147 @@ function getUserId() {
     localStorage.setItem('womenai_visitor_id', visitorId);
   }
   return visitorId;
+}
+
+// ========================================
+// GOOGLE AUTH MANAGEMENT
+// ========================================
+async function handleGoogleSignIn(response) {
+  try {
+    const res = await fetch('/api/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential: response.credential }),
+    });
+
+    const data = await res.json();
+    
+    if (data.success && data.user) {
+      currentUser = data.user;
+      localStorage.setItem('womenai_user', JSON.stringify(data.user));
+      
+      // Eski sohbetleri Google hesabına taşı
+      const oldVisitorId = localStorage.getItem('womenai_visitor_id');
+      if (oldVisitorId) {
+        await migrateChatsToGoogleAccount(oldVisitorId, data.user.id);
+      }
+      
+      updateUserUI();
+      loadChatHistory(); // Sohbetleri yeniden yükle
+      console.log('✅ Google ile giriş başarılı:', data.user.name);
+    } else {
+      console.error('Google giriş hatası:', data.error);
+      alert('Giriş başarısız: ' + (data.error || 'Bilinmeyen hata'));
+    }
+  } catch (err) {
+    console.error('Google auth error:', err);
+    alert('Giriş sırasında bir hata oluştu');
+  }
+}
+
+async function migrateChatsToGoogleAccount(visitorId, googleUserId) {
+  try {
+    const res = await fetch('/api/auth/migrate-chats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ visitorId, googleUserId }),
+    });
+    
+    const data = await res.json();
+    if (data.success && data.migratedCount > 0) {
+      console.log(`✅ ${data.migratedCount} sohbet Google hesabına taşındı`);
+    }
+  } catch (err) {
+    console.error('Chat migration error:', err);
+  }
+}
+
+function handleGoogleSignOut() {
+  currentUser = null;
+  localStorage.removeItem('womenai_user');
+  updateUserUI();
+  loadChatHistory(); // Misafir olarak sohbetleri yükle
+  console.log('✅ Çıkış yapıldı');
+}
+
+function updateUserUI() {
+  const userGuest = document.getElementById('user-guest');
+  const userProfile = document.getElementById('user-profile');
+  const userAvatar = document.getElementById('user-avatar');
+  const userName = document.getElementById('user-name');
+  const userEmail = document.getElementById('user-email');
+
+  if (currentUser) {
+    // Giriş yapmış kullanıcı
+    if (userGuest) userGuest.style.display = 'none';
+    if (userProfile) userProfile.style.display = 'flex';
+    if (userAvatar) userAvatar.src = currentUser.picture || 'https://via.placeholder.com/40';
+    if (userName) userName.textContent = currentUser.name || 'Kullanıcı';
+    if (userEmail) userEmail.textContent = currentUser.email || '';
+  } else {
+    // Misafir kullanıcı
+    if (userGuest) userGuest.style.display = 'block';
+    if (userProfile) userProfile.style.display = 'none';
+  }
+}
+
+function initGoogleAuth() {
+  // Local storage'dan kullanıcıyı yükle
+  const savedUser = localStorage.getItem('womenai_user');
+  if (savedUser) {
+    try {
+      currentUser = JSON.parse(savedUser);
+      updateUserUI();
+    } catch (e) {
+      localStorage.removeItem('womenai_user');
+    }
+  }
+
+  // Google Sign-In butonu event listener
+  const googleLoginBtn = document.getElementById('google-login-btn');
+  if (googleLoginBtn) {
+    googleLoginBtn.addEventListener('click', () => {
+      // Google One Tap / Sign-In popup
+      if (window.google && window.google.accounts) {
+        google.accounts.id.prompt();
+      } else {
+        alert('Google Sign-In yüklenemedi. Sayfayı yenileyin.');
+      }
+    });
+  }
+
+  // Çıkış butonu
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', handleGoogleSignOut);
+  }
+
+  // Google Identity Services'ı initialize et
+  // Not: GOOGLE_CLIENT_ID server'dan alınmalı
+  fetchGoogleClientId();
+}
+
+async function fetchGoogleClientId() {
+  try {
+    // Server'dan config al
+    const response = await fetch('/api/config');
+    const config = await response.json();
+    const clientId = config.googleClientId;
+    
+    if (clientId && window.google && window.google.accounts) {
+      google.accounts.id.initialize({
+        client_id: clientId,
+        callback: handleGoogleSignIn,
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+      console.log('✅ Google Sign-In hazır');
+    } else if (!clientId) {
+      console.warn('⚠️ Google Client ID yapılandırılmamış');
+    }
+  } catch (err) {
+    console.error('Google Client ID alınamadı:', err);
+  }
 }
 
 // DOM Elements
@@ -46,8 +195,55 @@ const elements = {
   weatherDate: document.getElementById('weather-date'),
   weatherHeaderIcon: document.getElementById('weather-header-icon'),
   modeBtns: document.querySelectorAll('.mode-btn'),
-  quickActionBtns: document.querySelectorAll('.quick-action-btn')
+  quickActionBtns: document.querySelectorAll('.quick-action-btn'),
+  // Mobile elements
+  mobileMenuToggle: document.getElementById('mobile-menu-toggle'),
+  sidebar: document.getElementById('sidebar'),
+  sidebarOverlay: document.getElementById('sidebar-overlay')
 };
+
+// ========================================
+// MOBILE MENU MANAGEMENT
+// ========================================
+function initMobileMenu() {
+  if (elements.mobileMenuToggle && elements.sidebar && elements.sidebarOverlay) {
+    // Toggle sidebar
+    elements.mobileMenuToggle.addEventListener('click', toggleSidebar);
+    
+    // Close sidebar when clicking overlay
+    elements.sidebarOverlay.addEventListener('click', closeSidebar);
+    
+    // Close sidebar on escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && elements.sidebar.classList.contains('open')) {
+        closeSidebar();
+      }
+    });
+    
+    // Close sidebar when a chat is selected or action is performed
+    elements.chatHistory?.addEventListener('click', (e) => {
+      if (e.target.closest('.chat-list-item')) {
+        closeSidebar();
+      }
+    });
+    
+    elements.newChatBtn?.addEventListener('click', () => {
+      setTimeout(closeSidebar, 100);
+    });
+  }
+}
+
+function toggleSidebar() {
+  elements.sidebar.classList.toggle('open');
+  elements.sidebarOverlay.classList.toggle('active');
+  document.body.style.overflow = elements.sidebar.classList.contains('open') ? 'hidden' : '';
+}
+
+function closeSidebar() {
+  elements.sidebar.classList.remove('open');
+  elements.sidebarOverlay.classList.remove('active');
+  document.body.style.overflow = '';
+}
 
 // ========================================
 // THEME MANAGEMENT
@@ -125,8 +321,8 @@ async function loadChat(chatId) {
 async function startNewChat() {
   // Mevcut sohbet boşsa yeni sohbet açma
   if (currentChatId && messages.length === 0) {
-    console.log('Mevcut sohbet zaten boş, yeni sohbet açılmadı');
-    showWelcomeView();
+    console.log('Mevcut sohbet zaten boş, direkt chat view göster');
+    showChatView();
     return;
   }
   
@@ -141,7 +337,7 @@ async function startNewChat() {
     messages = [];
     renderMessages();
     loadChatHistory();
-    showWelcomeView();
+    showChatView();
   } catch (error) {
     console.error('New chat error:', error);
   }
@@ -150,6 +346,9 @@ async function startNewChat() {
 async function sendMessage(content = null) {
   const text = content || elements.chatInput.value.trim();
   if (!text) return;
+  
+  // Disabled durumunda işlem yapma
+  if (elements.sendBtn.disabled) return;
   
   // chatId yoksa önce yeni sohbet oluştur
   if (!currentChatId) {
@@ -178,6 +377,7 @@ async function sendMessage(content = null) {
   
   // Disable send button
   elements.sendBtn.disabled = true;
+  elements.sendBtn.style.opacity = '0.5';
   
   try {
     const res = await fetch(API_URL, {
@@ -213,8 +413,15 @@ async function sendMessage(content = null) {
     });
     renderMessages();
   } finally {
+    // Re-enable send button
     elements.sendBtn.disabled = false;
-    elements.chatInput.focus();
+    elements.sendBtn.style.opacity = '1';
+    elements.sendBtn.style.transform = ''; // Reset transform
+    
+    // Focus input (sadece desktop'ta)
+    if (window.innerWidth > 768) {
+      elements.chatInput.focus();
+    }
   }
 }
 
@@ -275,6 +482,11 @@ function showWelcomeView() {
 function showChatView() {
   elements.welcomeScreen.classList.add('hidden');
   elements.chatMessages.classList.add('active');
+  
+  // Focus input
+  if (elements.chatInput) {
+    elements.chatInput.focus();
+  }
 }
 
 // ========================================
@@ -338,18 +550,56 @@ async function loadWeather() {
 }
 
 // ========================================
-// INPUT HANDLING
+// INPUT HANDLING - MOBİL İYİLEŞTİRMELERİ
 // ========================================
 function autoResizeTextarea() {
   const textarea = elements.chatInput;
+  if (!textarea) return;
+  
+  // Reset height first to get accurate scrollHeight
   textarea.style.height = 'auto';
-  textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+  
+  // Calculate new height with proper padding (mobil için azaltılmış)
+  const scrollHeight = textarea.scrollHeight;
+  const newHeight = Math.min(scrollHeight, 150);
+  
+  textarea.style.height = newHeight + 'px';
+  textarea.style.overflowY = scrollHeight > 150 ? 'auto' : 'hidden';
 }
 
 function handleKeyDown(e) {
+  // Enter ile gönderme (Shift+Enter ile yeni satır)
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
     sendMessage();
+  }
+}
+
+// Mobil için geliştirilmiş gönder butonu işleyicisi
+function handleSendButton(e) {
+  e.preventDefault(); // Varsayılan davranışı engelle
+  e.stopPropagation(); // Event bubbling'i durdur
+  
+  // Disabled kontrolü
+  if (elements.sendBtn.disabled) return;
+  
+  // Mesaj gönder
+  sendMessage();
+}
+
+// ========================================
+// MOBİL KLAVYE UYUMLULUK
+// ========================================
+function adjustForKeyboard() {
+  // Mobil klavye açıldığında viewport yüksekliği değişir
+  const viewportHeight = window.innerHeight;
+  const isKeyboardOpen = viewportHeight < window.screen.height * 0.75;
+  
+  if (isKeyboardOpen && elements.chatMessages) {
+    // Klavye açıkken mesajları scroll et
+    setTimeout(() => {
+      elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+    }, 100);
   }
 }
 
@@ -363,26 +613,54 @@ function selectMode(btn) {
 }
 
 // ========================================
-// EVENT LISTENERS
+// EVENT LISTENERS - MOBİL GÜNCELLEMELER
 // ========================================
 function initEventListeners() {
   // Theme toggle
-  elements.themeToggle.addEventListener('click', toggleTheme);
+  elements.themeToggle?.addEventListener('click', toggleTheme);
   
   // Chat operations
-  elements.newChatBtn.addEventListener('click', startNewChat);
-  elements.clearHistoryBtn.addEventListener('click', clearAllChats);
-  elements.sendBtn.addEventListener('click', () => sendMessage());
+  elements.newChatBtn?.addEventListener('click', startNewChat);
+  elements.clearHistoryBtn?.addEventListener('click', clearAllChats);
+  
+  // SEND BUTTON - Mobil uyumlu event handlers
+  if (elements.sendBtn) {
+    // Mouse click (desktop)
+    elements.sendBtn.addEventListener('click', handleSendButton);
+    
+    // Touch events (mobile)
+    elements.sendBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault(); // Çift tıklama engellemesi
+      elements.sendBtn.style.transform = 'scale(0.95)'; // Görsel feedback
+    });
+    
+    elements.sendBtn.addEventListener('touchend', handleSendButton);
+    
+    elements.sendBtn.addEventListener('touchcancel', () => {
+      elements.sendBtn.style.transform = ''; // Reset
+    });
+  }
   
   // Input handling
-  elements.chatInput.addEventListener('input', autoResizeTextarea);
-  elements.chatInput.addEventListener('keydown', handleKeyDown);
+  if (elements.chatInput) {
+    elements.chatInput.addEventListener('input', autoResizeTextarea);
+    elements.chatInput.addEventListener('keydown', handleKeyDown);
+    
+    // Mobil klavye açıldığında scroll problemi çözümü
+    elements.chatInput.addEventListener('focus', () => {
+      setTimeout(() => {
+        if (elements.chatMessages.scrollHeight > 0) {
+          elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+        }
+      }, 300); // Klavye açılma animasyonu için gecikme
+    });
+  }
   
   // Weather modal
-  elements.weatherCard.addEventListener('click', openWeatherModal);
-  elements.weatherModalClose.addEventListener('click', closeWeatherModal);
-  elements.weatherRefresh.addEventListener('click', loadWeather);
-  elements.weatherModalOverlay.addEventListener('click', (e) => {
+  elements.weatherCard?.addEventListener('click', openWeatherModal);
+  elements.weatherModalClose?.addEventListener('click', closeWeatherModal);
+  elements.weatherRefresh?.addEventListener('click', loadWeather);
+  elements.weatherModalOverlay?.addEventListener('click', (e) => {
     if (e.target === elements.weatherModalOverlay) closeWeatherModal();
   });
   
@@ -398,21 +676,54 @@ function initEventListeners() {
       if (prompt) sendMessage(prompt);
     });
   });
+  
+  // Viewport resize handler (mobil klavye için)
+  // Otomatik resize devre dışı bırakıldı - CSS interactive-widget ile çözülecek
+  /*
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      adjustForKeyboard();
+    }, 100);
+  });
+  */
 }
-
 // ========================================
 // INITIALIZATION
 // ========================================
 async function init() {
-  initTheme();
-  initEventListeners();
-  await loadChatHistory();
+  console.log('🚀 Women AI başlatılıyor...');
   
-  // Hiç sohbet yoksa yeni oluştur
-  if (!currentChatId) {
+  initTheme();
+  initMobileMenu();
+  initEventListeners();
+  initGoogleAuth(); // Google OAuth başlat
+  
+  try {
+    await loadChatHistory();
+    // Direkt yeni sohbet başlat
     await startNewChat();
+  } catch (error) {
+    console.error('Chat history load error:', error);
   }
+  
+  console.log('✅ Women AI hazır!');
+  
+  // Input'ları her zaman aktif tut
+  setTimeout(() => {
+    if (elements.chatInput) {
+      elements.chatInput.disabled = false;
+      elements.chatInput.readOnly = false;
+      console.log('✅ Input aktif edildi');
+    }
+    if (elements.sendBtn) {
+      elements.sendBtn.disabled = false;
+      console.log('✅ Send button aktif edildi');
+    }
+  }, 500);
 }
 
-// Start app
 document.addEventListener('DOMContentLoaded', init);
+
+
