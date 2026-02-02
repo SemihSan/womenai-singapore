@@ -1178,8 +1178,76 @@
       }
     });
 
-    // Test bildirimi gönder (Admin veya kullanıcı kendine)
-    app.post('/api/push/test', async (req, res) => {
+    // Push abone istatistikleri (Admin only)
+    app.get('/api/push/stats', adminAuthMiddleware, async (req, res) => {
+      try {
+        const subscriberCount = await PushSubscription.countDocuments({ isActive: true });
+        const totalCount = await PushSubscription.countDocuments({});
+        
+        res.json({
+          subscriberCount,
+          totalCount,
+        });
+      } catch (err) {
+        console.error('Push stats error:', err);
+        res.status(500).json({ error: 'İstatistikler alınamadı' });
+      }
+    });
+
+    // Test bildirimi gönder (Admin panel için)
+    app.post('/api/push/test', adminAuthMiddleware, async (req, res) => {
+      try {
+        const { title, body, url } = req.body;
+
+        if (!title || !body) {
+          return res.status(400).json({ error: 'title ve body gerekli' });
+        }
+
+        if (!firebaseInitialized) {
+          return res.status(500).json({ error: 'Firebase yapılandırılmamış' });
+        }
+
+        // Admin'in son aktif subscription'ını bul veya tüm subscription'lardan birine gönder
+        const subscriptions = await PushSubscription.find({ isActive: true }).limit(1);
+        
+        if (subscriptions.length === 0) {
+          return res.status(400).json({ error: 'Aktif abone yok, önce bildirim iznini verin' });
+        }
+
+        const message = {
+          token: subscriptions[0].fcmToken,
+          notification: {
+            title,
+            body,
+          },
+          webpush: {
+            notification: {
+              icon: '/favicon.svg',
+              badge: '/favicon.svg',
+            },
+            fcmOptions: {
+              link: url || '/',
+            },
+          },
+          data: {
+            type: 'test',
+            url: url || '/',
+            timestamp: String(Date.now()),
+          },
+        };
+
+        const result = await admin.messaging().send(message);
+        console.log('📬 Test bildirimi gönderildi:', result);
+
+        res.json({ success: true, message: 'Bildirim gönderildi', messageId: result, successCount: 1 });
+      } catch (err) {
+        console.error('Push test error:', err);
+        res.status(500).json({ error: 'Bildirim gönderilemedi', details: err.message });
+      }
+    });
+
+    // Kullanıcı kendine test bildirimi gönder
+    app.post('/api/push/test-self', async (req, res) => {
       try {
         const { fcmToken, title, body } = req.body;
 
@@ -1223,7 +1291,7 @@
     // Toplu bildirim gönder (Admin only)
     app.post('/api/push/broadcast', adminAuthMiddleware, async (req, res) => {
       try {
-        const { title, body, type = 'news' } = req.body;
+        const { title, body, url, type = 'news' } = req.body;
 
         if (!title || !body) {
           return res.status(400).json({ error: 'title ve body gerekli' });
@@ -1241,7 +1309,7 @@
         });
 
         if (subscriptions.length === 0) {
-          return res.json({ success: true, sent: 0, message: 'Gönderilecek abone yok' });
+          return res.json({ success: true, successCount: 0, failureCount: 0, message: 'Gönderilecek abone yok' });
         }
 
         // Tüm token'lara gönder (Firebase Admin SDK multicast)
@@ -1257,8 +1325,11 @@
               icon: '/favicon.svg',
               badge: '/favicon.svg',
             },
+            fcmOptions: {
+              link: url || '/',
+            },
           },
-          data: { type, timestamp: String(Date.now()) },
+          data: { type, url: url || '/', timestamp: String(Date.now()) },
         };
 
         // Multicast gönder (max 500 token per batch)
@@ -1279,8 +1350,8 @@
 
         res.json({ 
           success: true, 
-          sent: successCount, 
-          failed: failureCount,
+          successCount, 
+          failureCount,
           total: tokens.length 
         });
       } catch (err) {
