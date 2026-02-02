@@ -1251,39 +1251,73 @@
           return res.status(500).json({ error: 'Firebase yapılandırılmamış' });
         }
 
-        // Admin'in son aktif subscription'ını bul veya tüm subscription'lardan birine gönder
-        const subscriptions = await PushSubscription.find({ isActive: true }).limit(1);
+        // Aktif subscription'ları bul
+        const subscriptions = await PushSubscription.find({ isActive: true }).limit(10);
         
         if (subscriptions.length === 0) {
           return res.status(400).json({ error: 'Aktif abone yok, önce bildirim iznini verin' });
         }
 
-        const message = {
-          token: subscriptions[0].fcmToken,
-          notification: {
-            title,
-            body,
-          },
-          webpush: {
-            notification: {
-              icon: '/favicon.svg',
-              badge: '/favicon.svg',
-            },
-            fcmOptions: {
-              link: url || '/',
-            },
-          },
-          data: {
-            type: 'test',
-            url: url || '/',
-            timestamp: String(Date.now()),
-          },
-        };
+        let successCount = 0;
+        let failedTokens = [];
 
-        const result = await admin.messaging().send(message);
-        console.log('📬 Test bildirimi gönderildi:', result);
+        // Her subscription'a göndermeyi dene
+        for (const sub of subscriptions) {
+          try {
+            const message = {
+              token: sub.fcmToken,
+              notification: {
+                title,
+                body,
+              },
+              webpush: {
+                notification: {
+                  icon: '/favicon.svg',
+                  badge: '/favicon.svg',
+                },
+                fcmOptions: {
+                  link: url || '/',
+                },
+              },
+              data: {
+                type: 'test',
+                url: url || '/',
+                timestamp: String(Date.now()),
+              },
+            };
 
-        res.json({ success: true, message: 'Bildirim gönderildi', messageId: result, successCount: 1 });
+            const result = await admin.messaging().send(message);
+            console.log('📬 Test bildirimi gönderildi:', result);
+            successCount++;
+            break; // Başarılı bir tane yeterli
+          } catch (sendErr) {
+            console.error('Token hatası:', sub.fcmToken.substring(0, 20) + '...', sendErr.code);
+            
+            // Geçersiz token'ları işaretle
+            if (sendErr.code === 'messaging/registration-token-not-registered' ||
+                sendErr.code === 'messaging/invalid-registration-token') {
+              failedTokens.push(sub._id);
+            }
+          }
+        }
+
+        // Geçersiz token'ları deaktif et
+        if (failedTokens.length > 0) {
+          await PushSubscription.updateMany(
+            { _id: { $in: failedTokens } },
+            { isActive: false }
+          );
+          console.log(`🗑️ ${failedTokens.length} geçersiz token deaktif edildi`);
+        }
+
+        if (successCount > 0) {
+          res.json({ success: true, message: 'Bildirim gönderildi', successCount });
+        } else {
+          res.status(400).json({ 
+            error: 'Tüm token\'lar geçersiz. Lütfen ana sayfada tekrar bildirim izni verin.',
+            invalidTokensRemoved: failedTokens.length
+          });
+        }
       } catch (err) {
         console.error('Push test error:', err);
         res.status(500).json({ error: 'Bildirim gönderilemedi', details: err.message });
