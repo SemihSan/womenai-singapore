@@ -233,6 +233,9 @@ function initGoogleAuth() {
   const urlParams = new URLSearchParams(window.location.search);
   const authData = urlParams.get('auth_success');
   
+  console.log('🔍 initGoogleAuth: URL params:', window.location.search);
+  console.log('🔍 initGoogleAuth: authData:', authData ? authData.substring(0, 30) + '...' : 'null');
+  
   if (authData) {
     try {
       // URL-safe base64'ü normal base64'e çevir
@@ -240,7 +243,10 @@ function initGoogleAuth() {
       const padding = base64.length % 4;
       const paddedBase64 = padding ? base64 + '='.repeat(4 - padding) : base64;
       
+      console.log('🔍 Decoding base64...');
       const userData = JSON.parse(atob(paddedBase64));
+      console.log('✅ userData parsed:', userData);
+      
       currentUser = userData;
       localStorage.setItem('womenai_user', JSON.stringify(userData));
       
@@ -250,17 +256,24 @@ function initGoogleAuth() {
       console.log('✅ OAuth ile giriş başarılı:', userData.name);
       updateUserUI();
       updateLoginState();
+      
+      // Sohbetleri yükle
+      loadChatHistory().then(() => startNewChat());
+      
       return; // Zaten giriş yapıldı, devam etme
     } catch (e) {
-      console.error('Auth data parse error:', e);
+      console.error('❌ Auth data parse error:', e);
     }
   }
   
   // Local storage'dan kullanıcıyı yükle
   const savedUser = localStorage.getItem('womenai_user');
+  console.log('🔍 savedUser from localStorage:', savedUser ? 'EXISTS' : 'NULL');
+  
   if (savedUser) {
     try {
       currentUser = JSON.parse(savedUser);
+      console.log('✅ User loaded from localStorage:', currentUser.name);
       updateUserUI();
       updateLoginState();
     } catch (e) {
