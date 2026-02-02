@@ -38,6 +38,30 @@ function getUserId() {
 // GOOGLE AUTH MANAGEMENT
 // ========================================
 let isGoogleSignInProgress = false; // Çoklu tıklama koruması
+let googleClientId = null; // Client ID'yi sakla
+
+// Google popup ile giriş yap (One Tap çalışmazsa fallback)
+function openGoogleSignInPopup() {
+  if (!googleClientId) {
+    alert('Google Sign-In yüklenemedi. Sayfayı yenileyin.');
+    return;
+  }
+  
+  const width = 500;
+  const height = 600;
+  const left = (window.innerWidth - width) / 2;
+  const top = (window.innerHeight - height) / 2;
+  
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+    `client_id=${googleClientId}&` +
+    `redirect_uri=${encodeURIComponent(window.location.origin + '/auth/google/callback')}&` +
+    `response_type=code&` +
+    `scope=${encodeURIComponent('openid email profile')}&` +
+    `prompt=select_account`;
+  
+  window.open(authUrl, 'Google Sign In', 
+    `width=${width},height=${height},left=${left},top=${top}`);
+}
 
 async function handleGoogleSignIn(response) {
   if (isGoogleSignInProgress) {
@@ -216,20 +240,8 @@ function initGoogleAuth() {
       e.preventDefault();
       if (isGoogleSignInProgress) return;
       
-      // Google One Tap / Sign-In popup
-      if (window.google && window.google.accounts) {
-        google.accounts.id.prompt((notification) => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            console.log('Google prompt gösterilmedi, popup deneyelim');
-            // One Tap gösterilemezse bilgi ver
-            if (notification.getNotDisplayedReason() === 'opt_out_or_no_session') {
-              alert('Google hesabınızla giriş yapmak için tarayıcınızda Google hesabına giriş yapın.');
-            }
-          }
-        });
-      } else {
-        alert('Google Sign-In yüklenemedi. Sayfayı yenileyin.');
-      }
+      // Popup ile giriş yap (One Tap cooldown sorununu çözer)
+      openGoogleSignInPopup();
     });
   }
 
@@ -240,18 +252,8 @@ function initGoogleAuth() {
       e.preventDefault();
       if (isGoogleSignInProgress) return;
       
-      if (window.google && window.google.accounts) {
-        google.accounts.id.prompt((notification) => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            console.log('Google prompt gösterilmedi:', notification.getNotDisplayedReason());
-            if (notification.getNotDisplayedReason() === 'opt_out_or_no_session') {
-              alert('Google hesabınızla giriş yapmak için tarayıcınızda Google hesabına giriş yapın.');
-            }
-          }
-        });
-      } else {
-        alert('Google Sign-In yüklenemedi. Sayfayı yenileyin.');
-      }
+      // Popup ile giriş yap
+      openGoogleSignInPopup();
     });
   }
 
@@ -271,6 +273,9 @@ async function fetchGoogleClientId() {
     const response = await fetch('/api/config');
     const config = await response.json();
     const clientId = config.googleClientId;
+    
+    // Client ID'yi global değişkene kaydet (popup için)
+    googleClientId = clientId;
     
     if (clientId && window.google && window.google.accounts) {
       google.accounts.id.initialize({

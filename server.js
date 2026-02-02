@@ -963,7 +963,138 @@
       8.1) Google OAuth API
       ========================================================= */
 
-    // Google ile giriş yap / kayıt ol
+    // OAuth callback sayfası - popup'tan code alır ve ana sayfaya yönlendirir
+    app.get('/auth/google/callback', (req, res) => {
+      const { code, error } = req.query;
+      
+      if (error) {
+        return res.send(`
+          <html>
+            <body>
+              <script>
+                window.close();
+              </script>
+              <p>Giriş iptal edildi. Bu pencereyi kapatabilirsiniz.</p>
+            </body>
+          </html>
+        `);
+      }
+      
+      if (!code) {
+        return res.status(400).send('Authorization code eksik');
+      }
+      
+      // Code'u server-side işle ve kullanıcıya redirect et
+      res.send(`
+        <html>
+          <body>
+            <p>Giriş yapılıyor...</p>
+            <script>
+              // Code'u parent window'a gönder veya doğrudan işle
+              fetch('/api/auth/google/code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: '${code}' })
+              })
+              .then(r => r.json())
+              .then(data => {
+                if (data.success && window.opener) {
+                  // Ana sayfada localStorage'ı güncelle
+                  window.opener.localStorage.setItem('womenai_user', JSON.stringify(data.user));
+                  window.opener.location.reload();
+                }
+                window.close();
+              })
+              .catch(() => {
+                document.body.innerHTML = '<p>Hata oluştu. Bu pencereyi kapatıp tekrar deneyin.</p>';
+              });
+            </script>
+          </body>
+        </html>
+      `);
+    });
+
+    // OAuth code'u token'a çevir
+    app.post('/api/auth/google/code', async (req, res) => {
+      try {
+        const { code } = req.body;
+        
+        if (!code) {
+          return res.status(400).json({ error: 'Authorization code gerekli' });
+        }
+
+        const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+        const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+        
+        if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+          return res.status(500).json({ error: 'Google OAuth yapılandırılmamış' });
+        }
+
+        // Code'u token'a çevir
+        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            code,
+            client_id: GOOGLE_CLIENT_ID,
+            client_secret: GOOGLE_CLIENT_SECRET,
+            redirect_uri: `${req.protocol}://${req.get('host')}/auth/google/callback`,
+            grant_type: 'authorization_code',
+          }),
+        });
+
+        const tokenData = await tokenResponse.json();
+        
+        if (tokenData.error) {
+          console.error('Google token error:', tokenData);
+          return res.status(401).json({ error: 'Token alınamadı: ' + tokenData.error_description });
+        }
+
+        // ID token'dan kullanıcı bilgilerini al
+        const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        });
+
+        const userInfo = await userInfoResponse.json();
+        const { id: googleId, email, name, picture } = userInfo;
+
+        // Kullanıcıyı bul veya oluştur
+        let user = await User.findOne({ googleId });
+        
+        if (user) {
+          user.lastLogin = new Date();
+          user.name = name;
+          user.picture = picture;
+          await user.save();
+        } else {
+          user = new User({
+            googleId,
+            email,
+            name,
+            picture,
+          });
+          await user.save();
+          console.log(`✅ Yeni kullanıcı kaydedildi: ${email}`);
+        }
+
+        return res.json({
+          success: true,
+          user: {
+            id: user._id,
+            googleId: user.googleId,
+            email: user.email,
+            name: user.name,
+            picture: user.picture,
+          },
+        });
+
+      } catch (err) {
+        console.error('Google code auth error:', err);
+        return res.status(500).json({ error: 'Google ile giriş başarısız' });
+      }
+    });
+
+    // Google ile giriş yap / kayıt ol (One Tap için - eski yöntem)
     app.post('/api/auth/google', async (req, res) => {
       try {
         const { credential } = req.body;
