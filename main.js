@@ -179,7 +179,12 @@ function updateLoginState() {
   if (currentUser) {
     // Giriş yapılmış - chat alanını göster
     console.log('✅ Showing chat, hiding login screen');
-    if (loginScreen) loginScreen.style.display = 'none';
+    if (loginScreen) {
+      loginScreen.style.display = 'none';
+      loginScreen.style.visibility = 'hidden';
+      loginScreen.style.position = 'absolute';
+      loginScreen.style.pointerEvents = 'none';
+    }
     if (chatContainer) chatContainer.style.display = 'flex';
     if (sidebar) sidebar.classList.remove('login-required');
     if (mobileMenuToggle) {
@@ -190,7 +195,12 @@ function updateLoginState() {
   } else {
     // Giriş yapılmamış - login ekranını göster
     console.log('❌ Showing login screen, hiding chat');
-    if (loginScreen) loginScreen.style.display = 'flex';
+    if (loginScreen) {
+      loginScreen.style.display = 'flex';
+      loginScreen.style.visibility = 'visible';
+      loginScreen.style.position = 'relative';
+      loginScreen.style.pointerEvents = 'auto';
+    }
     if (chatContainer) chatContainer.style.display = 'none';
     if (sidebar) sidebar.classList.add('login-required');
     if (mobileMenuToggle) {
