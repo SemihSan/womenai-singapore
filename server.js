@@ -979,6 +979,13 @@
         const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
         const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
         
+        console.log('🔑 OAuth config check:', {
+          hasClientId: !!GOOGLE_CLIENT_ID,
+          hasClientSecret: !!GOOGLE_CLIENT_SECRET,
+          clientSecretLength: GOOGLE_CLIENT_SECRET ? GOOGLE_CLIENT_SECRET.length : 0,
+          clientSecretPrefix: GOOGLE_CLIENT_SECRET ? GOOGLE_CLIENT_SECRET.substring(0, 10) : 'N/A'
+        });
+        
         if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
           return res.redirect('/?error=oauth_not_configured');
         }
