@@ -983,6 +983,13 @@
           return res.redirect('/?error=oauth_not_configured');
         }
 
+        // Redirect URI - proxy arkasında HTTPS kullan
+        const protocol = req.get('x-forwarded-proto') || req.protocol;
+        const host = req.get('host');
+        const redirectUri = `https://${host}/auth/google/callback`;
+        
+        console.log('🔗 OAuth redirect_uri:', redirectUri);
+
         // Code'u token'a çevir
         const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
           method: 'POST',
@@ -991,7 +998,7 @@
             code,
             client_id: GOOGLE_CLIENT_ID,
             client_secret: GOOGLE_CLIENT_SECRET,
-            redirect_uri: `${req.protocol}://${req.get('host')}/auth/google/callback`,
+            redirect_uri: redirectUri,
             grant_type: 'authorization_code',
           }),
         });
@@ -1000,7 +1007,7 @@
         
         if (tokenData.error) {
           console.error('Google token error:', tokenData);
-          return res.redirect('/?error=token_failed');
+          return res.redirect('/?error=token_failed&reason=' + encodeURIComponent(tokenData.error_description || tokenData.error));
         }
 
         // ID token'dan kullanıcı bilgilerini al
