@@ -167,8 +167,18 @@ function updateLoginState() {
   const mainContent = document.querySelector('.main-content');
   const inputContainer = document.querySelector('.input-container');
 
+  console.log('🔄 updateLoginState called, currentUser:', currentUser ? currentUser.name : 'null');
+  console.log('🔄 DOM elements:', {
+    loginScreen: !!loginScreen,
+    chatContainer: !!chatContainer,
+    sidebar: !!sidebar,
+    mainContent: !!mainContent,
+    inputContainer: !!inputContainer
+  });
+
   if (currentUser) {
     // Giriş yapılmış - chat alanını göster
+    console.log('✅ Showing chat, hiding login screen');
     if (loginScreen) loginScreen.style.display = 'none';
     if (chatContainer) chatContainer.style.display = 'flex';
     if (sidebar) sidebar.classList.remove('login-required');
@@ -179,6 +189,7 @@ function updateLoginState() {
     if (inputContainer) inputContainer.style.display = 'block';
   } else {
     // Giriş yapılmamış - login ekranını göster
+    console.log('❌ Showing login screen, hiding chat');
     if (loginScreen) loginScreen.style.display = 'flex';
     if (chatContainer) chatContainer.style.display = 'none';
     if (sidebar) sidebar.classList.add('login-required');
