@@ -1,0 +1,78 @@
+Proje Planlaması			
+Faz	Görev	Durum	Tamamlanma
+Faz 1 - Temel Altyapı	Node.js/Express backend kurulumu	Tamamlandı	100%
+Faz 1 - Temel Altyapı	MongoDB veritabanı entegrasyonu	Tamamlandı	100%
+Faz 1 - Temel Altyapı	OpenAI GPT-4o API entegrasyonu	Tamamlandı	100%
+Faz 1 - Temel Altyapı	Coolify üzerinde deployment	Tamamlandı	100%
+Faz 1 - Temel Altyapı	SSL sertifikası (HTTPS)	Tamamlandı	100%
+Faz 1 - Temel Altyapı	Domain yapılandırması	Tamamlandı	100%
+Faz 2 - Kullanıcı Arayüzü	ChatGPT tarzı modern arayüz	Tamamlandı	100%
+Faz 2 - Kullanıcı Arayüzü	Responsive tasarım	Tamamlandı	100%
+Faz 2 - Kullanıcı Arayüzü	Karanlık/Aydınlık tema desteği	Tamamlandı	100%
+Faz 2 - Kullanıcı Arayüzü	Türkçe dil desteği	Tamamlandı	100%
+Faz 2 - Kullanıcı Arayüzü	Glassmorphism login ekranı	Tamamlandı	100%
+Faz 2 - Kullanıcı Arayüzü	Animasyonlu gradient arka planlar	Tamamlandı	100%
+Faz 3 - Temel Özellikler	Gerçek zamanlı AI sohbet	Tamamlandı	100%
+Faz 3 - Temel Özellikler	Sohbet geçmişi kaydetme	Tamamlandı	100%
+Faz 3 - Temel Özellikler	Mod seçimi	Tamamlandı	100%
+Faz 3 - Temel Özellikler	Hava durumu bazlı cilt analizi	Tamamlandı	100%
+Faz 3 - Temel Özellikler	Hızlı eylem butonları	Tamamlandı	100%
+Faz 3 - Temel Özellikler	Ürün önerisi sistemi (Mini RAG)	Tamamlandı	100%
+Faz 4 - Güvenlik & Performans	Helmet.js güvenlik başlıkları	Tamamlandı	100%
+Faz 4 - Güvenlik & Performans	Rate limiting	Tamamlandı	100%
+Faz 4 - Güvenlik & Performans	CORS politikası	Tamamlandı	100%
+Faz 4 - Güvenlik & Performans	bcrypt şifre hashleme	Tamamlandı	100%
+Faz 4 - Güvenlik & Performans	XSS/Injection koruması	Tamamlandı	100%
+Faz 5 - Google OAuth	Google Identity Services entegrasyonu	Tamamlandı	100%
+Faz 5 - Google OAuth	Zorunlu giriş sistemi	Tamamlandı	100%
+Faz 5 - Google OAuth	Kullanıcı profil yönetimi	Tamamlandı	100%
+Faz 5 - Google OAuth	Sohbet geçmişi senkronizasyonu	Tamamlandı	100%
+Faz 5 - Google OAuth	Çoklu tıklama koruması	Tamamlandı	100%
+Faz 5 - Google OAuth	Mobil uyumluluk optimizasyonu	Tamamlandı	100%
+Faz 5 - Google OAuth	Misafir → Google hesabı sohbet taşıma	Tamamlandı	100%
+Faz 6 - Admin Paneli	Admin girişi 	Tamamlandı	100%
+Faz 6 - Admin Paneli	System prompt yönetimi	Tamamlandı	100%
+Faz 6 - Admin Paneli	Mod bazlı prompt özelleştirme	Tamamlandı	100%
+Faz 6 - Admin Paneli	AI model parametreleri	Tamamlandı	100%
+Faz 6 - Admin Paneli	Kullanıcı istatistikleri	Tamamlandı	100%
+			
+			MOBİL UYGULAMAYA DÖNÜŞTÜRÜCEZ BUNU
+			
+Yapılacaklar Planlaması			
+Görev	Süre (Gün)	Başlangıç	Bitiş
+Push Notification Altyapısı	1	31.01.2026 (Cumartesi)	2.02.2026 (Pazartesi)
+Günlük Cilt Bakımı Hatırlatıcısı	0.5	03.02.2026 (Salı)	04.02.2026 (Çarşamba)
+Su İçme Hatırlatıcısı	0.5	03.02.2026 (Salı)	04.02.2026 (Çarşamba)
+Özelleştirilebilir Hatırlatma Saatleri	0.5	05.02.2026 (Perşembe)	05.02.2026
+Kullanıcı Profil Sayfası	1	06.02.2026 (Cuma)	06.02.2026 (Cuma)
+Cilt Tipi Anketi	1	07.02.2026 (Cumartesi)	07.02.2026 (Cumartesi)
+Yaş/Cinsiyet/Bölge Bilgisi	0.5	09.02.2026 (Pazartesi)	09.02.2026 (Pazartesi)
+Alerji ve Hassasiyet Kaydı	0.5	10.02.2026 (Salı)	10.02.2026 (Salı)
+Kişiselleştirilmiş AI Yanıtları	1	11.02.2026 (Çarşamba)	11.02.2026 (Çarşamba)
+Google Analytics 4 Entegrasyonu	0.5	12.02.2026 (Perşembe)	12.02.2026 (Perşembe)
+Kullanıcı Davranış Takibi	1	13.02.2026 (Cuma)	13.02.2026 (Cuma)
+Sohbet İstatistikleri Dashboard	1	14.02.2026 (Cumartesi)	14.02.2026 (Cumartesi)
+Popüler Sorular Analizi	1	16.02.2026 (Pazartesi)	16.02.2026 (Pazartesi)
+Admin Raporlama Paneli	1	17.02.2026 (Salı)	17.02.2026 (Salı)
+Fotoğraf Yükleme Özelliği	1	18.02.2026 (Çarşamba)	18.02.2026 (Çarşamba)
+GPT-4 Vision Entegrasyonu	1	19.02.2026 (Perşembe)	19.02.2026 (Perşembe)
+Cilt Analizi (Fotoğraftan)	2	20.02.2026 (Cuma)	21.02.2026 (Cumartesi)
+Güvenli Görsel Depolama	1	23.02.2026 (Pazartesi)	23.02.2026 (Pazartesi)
+Görsel Geçmişi ve Karşılaştırma	2	24.02.2026 (Salı)	25.02.2026 (Çarşamba)
+i18n Altyapısı	1	26.02.2026 (Perşembe)	26.02.2026 (Perşembe)
+İngilizce Çeviri	1	27.02.2026 (Cuma)	27.02.2026 (Cuma)
+Arapça Çeviri (RTL)	1	28.02.2026 (Cumartesi)	28.02.2026 (Cumartesi)
+Dil Seçici UI	0.5	02.03.2026 (Pazartesi)	02.03.2026 (Pazartesi)
+AI Yanıtlarında Çoklu Dil	0.5	03.03.2026 (Salı)	03.03.2026 (Salı)
+PWA Manifest & SW	1	04.03.2026 (Çarşamba)	04.03.2026 (Çarşamba)
+Offline Mod Desteği	2	05.03.2026 (Perşembe)	06.03.2026 (Cuma)
+Store Publish	3	07.03.2026 (Cumartesi)	10.03.2026 (Salı)
+Native Push Notifications	1	11.03.2026 (Çarşamba)	11.03.2026 (Çarşamba)
+Biometric Login	1	12.03.2026 (Perşembe)	12.03.2026 (Perşembe)
+Topluluk Forumu	3	13.03.2026 (Cuma)	16.03.2026 (Pazartesi)
+Tarif/Rutin Paylaşımı	2	17.03.2026 (Salı)	18.03.2026 (Çarşamba)
+Kullanıcı Yorumları	1	19.03.2026 (Perşembe)	19.03.2026 (Perşembe)
+Liderlik Tablosu	1	20.03.2026 (Cuma)	20.03.2026 (Cuma)
+Premium AI Modeli	3	21.03.2026 (Cumartesi)	24.03.2026 (Salı)
+Sınırsız Sohbet Paketi	1	25.03.2026 (Çarşamba)	25.03.2026 (Çarşamba)
+Özel Danışman Modu	1	26.03.2026 (Perşembe)	26.03.2026 (Perşembe)
