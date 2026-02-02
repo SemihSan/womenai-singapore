@@ -33,9 +33,12 @@
           envValue = envValue.slice(1, -1);
         }
         
-        // Escaped karakterleri düzelt
-        envValue = envValue.replace(/\\"/g, '"'); // \" -> "
-        envValue = envValue.replace(/\\n/g, '\n'); // \n -> newline
+        // Escaped karakterleri düzelt (Coolify JSON'u escape ediyor)
+        // \" -> " (escaped quotes)
+        envValue = envValue.replace(/\\"/g, '"');
+        // \\\\ -> \\ (double escaped backslashes - for private_key \n sequences)  
+        // Coolify: \n -> \\n, so we need to keep \n as literal for JSON.parse
+        // Don't convert \n to actual newlines - JSON.parse handles \n escape sequences
         
         // Base64 encoded olabilir mi kontrol et
         if (!envValue.startsWith('{')) {
