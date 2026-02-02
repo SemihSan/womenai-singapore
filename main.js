@@ -47,20 +47,31 @@ function openGoogleSignInPopup() {
     return;
   }
   
-  const width = 500;
-  const height = 600;
-  const left = (window.innerWidth - width) / 2;
-  const top = (window.innerHeight - height) / 2;
+  const redirectUri = window.location.origin + '/auth/google/callback';
   
   const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
     `client_id=${googleClientId}&` +
-    `redirect_uri=${encodeURIComponent(window.location.origin + '/auth/google/callback')}&` +
+    `redirect_uri=${encodeURIComponent(redirectUri)}&` +
     `response_type=code&` +
     `scope=${encodeURIComponent('openid email profile')}&` +
     `prompt=select_account`;
   
-  window.open(authUrl, 'Google Sign In', 
-    `width=${width},height=${height},left=${left},top=${top}`);
+  // Mobil cihaz tespiti
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  
+  if (isMobile) {
+    // Mobilde aynı pencerede redirect yap (popup'lar sorunlu)
+    window.location.href = authUrl;
+  } else {
+    // Desktop'ta popup aç
+    const width = 500;
+    const height = 600;
+    const left = (window.innerWidth - width) / 2;
+    const top = (window.innerHeight - height) / 2;
+    
+    window.open(authUrl, 'Google Sign In', 
+      `width=${width},height=${height},left=${left},top=${top}`);
+  }
 }
 
 async function handleGoogleSignIn(response) {

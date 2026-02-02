@@ -964,54 +964,110 @@
       ========================================================= */
 
     // OAuth callback sayfası - popup'tan code alır ve ana sayfaya yönlendirir
-    app.get('/auth/google/callback', (req, res) => {
+    app.get('/auth/google/callback', async (req, res) => {
       const { code, error } = req.query;
       
       if (error) {
-        return res.send(`
-          <html>
-            <body>
-              <script>
-                window.close();
-              </script>
-              <p>Giriş iptal edildi. Bu pencereyi kapatabilirsiniz.</p>
-            </body>
-          </html>
-        `);
+        return res.redirect('/?error=login_cancelled');
       }
       
       if (!code) {
         return res.status(400).send('Authorization code eksik');
       }
       
-      // Code'u server-side işle ve kullanıcıya redirect et
-      res.send(`
-        <html>
+      try {
+        const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+        const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+        
+        if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+          return res.redirect('/?error=oauth_not_configured');
+        }
+
+        // Code'u token'a çevir
+        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            code,
+            client_id: GOOGLE_CLIENT_ID,
+            client_secret: GOOGLE_CLIENT_SECRET,
+            redirect_uri: `${req.protocol}://${req.get('host')}/auth/google/callback`,
+            grant_type: 'authorization_code',
+          }),
+        });
+
+        const tokenData = await tokenResponse.json();
+        
+        if (tokenData.error) {
+          console.error('Google token error:', tokenData);
+          return res.redirect('/?error=token_failed');
+        }
+
+        // ID token'dan kullanıcı bilgilerini al
+        const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        });
+
+        const userInfo = await userInfoResponse.json();
+        const { id: googleId, email, name, picture } = userInfo;
+
+        // Kullanıcıyı bul veya oluştur
+        let user = await User.findOne({ googleId });
+        
+        if (user) {
+          user.lastLogin = new Date();
+          user.name = name;
+          user.picture = picture;
+          await user.save();
+        } else {
+          user = new User({
+            googleId,
+            email,
+            name,
+            picture,
+          });
+          await user.save();
+          console.log(`✅ Yeni kullanıcı kaydedildi: ${email}`);
+        }
+
+        // Kullanıcı bilgilerini URL-safe base64 olarak encode et
+        const userData = Buffer.from(JSON.stringify({
+          id: user._id,
+          googleId: user.googleId,
+          email: user.email,
+          name: user.name,
+          picture: user.picture,
+        })).toString('base64');
+
+        // Ana sayfaya redirect et, kullanıcı bilgisi ile
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+          <head><title>Giriş Yapılıyor...</title></head>
           <body>
-            <p>Giriş yapılıyor...</p>
+            <p>Giriş yapılıyor, lütfen bekleyin...</p>
             <script>
-              // Code'u parent window'a gönder veya doğrudan işle
-              fetch('/api/auth/google/code', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: '${code}' })
-              })
-              .then(r => r.json())
-              .then(data => {
-                if (data.success && window.opener) {
-                  // Ana sayfada localStorage'ı güncelle
-                  window.opener.localStorage.setItem('womenai_user', JSON.stringify(data.user));
-                  window.opener.location.reload();
-                }
+              const userData = JSON.parse(atob('${userData}'));
+              localStorage.setItem('womenai_user', JSON.stringify(userData));
+              
+              // Popup mı yoksa redirect mi kontrol et
+              if (window.opener) {
+                // Popup - parent'ı yenile ve kapat
+                window.opener.location.reload();
                 window.close();
-              })
-              .catch(() => {
-                document.body.innerHTML = '<p>Hata oluştu. Bu pencereyi kapatıp tekrar deneyin.</p>';
-              });
+              } else {
+                // Redirect - ana sayfaya git
+                window.location.href = '/';
+              }
             </script>
           </body>
-        </html>
-      `);
+          </html>
+        `);
+
+      } catch (err) {
+        console.error('Google callback error:', err);
+        res.redirect('/?error=auth_failed');
+      }
     });
 
     // OAuth code'u token'a çevir
