@@ -1051,32 +1051,10 @@
           email: user.email,
           name: user.name,
           picture: user.picture,
-        })).toString('base64');
+        })).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 
-        // Ana sayfaya redirect et, kullanıcı bilgisi ile
-        res.send(`
-          <!DOCTYPE html>
-          <html>
-          <head><title>Giriş Yapılıyor...</title></head>
-          <body>
-            <p>Giriş yapılıyor, lütfen bekleyin...</p>
-            <script>
-              const userData = JSON.parse(atob('${userData}'));
-              localStorage.setItem('womenai_user', JSON.stringify(userData));
-              
-              // Popup mı yoksa redirect mi kontrol et
-              if (window.opener) {
-                // Popup - parent'ı yenile ve kapat
-                window.opener.location.reload();
-                window.close();
-              } else {
-                // Redirect - ana sayfaya git
-                window.location.href = '/';
-              }
-            </script>
-          </body>
-          </html>
-        `);
+        // Ana sayfaya redirect et, kullanıcı bilgisi URL'de
+        res.redirect(`/?auth_success=${userData}`);
 
       } catch (err) {
         console.error('Google callback error:', err);

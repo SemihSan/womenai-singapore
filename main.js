@@ -229,6 +229,33 @@ function updateUserUI() {
 }
 
 function initGoogleAuth() {
+  // URL'den auth bilgisini kontrol et (OAuth callback'ten redirect)
+  const urlParams = new URLSearchParams(window.location.search);
+  const authData = urlParams.get('auth_success');
+  
+  if (authData) {
+    try {
+      // URL-safe base64'ü normal base64'e çevir
+      const base64 = authData.replace(/-/g, '+').replace(/_/g, '/');
+      const padding = base64.length % 4;
+      const paddedBase64 = padding ? base64 + '='.repeat(4 - padding) : base64;
+      
+      const userData = JSON.parse(atob(paddedBase64));
+      currentUser = userData;
+      localStorage.setItem('womenai_user', JSON.stringify(userData));
+      
+      // URL'den auth parametresini temizle
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      console.log('✅ OAuth ile giriş başarılı:', userData.name);
+      updateUserUI();
+      updateLoginState();
+      return; // Zaten giriş yapıldı, devam etme
+    } catch (e) {
+      console.error('Auth data parse error:', e);
+    }
+  }
+  
   // Local storage'dan kullanıcıyı yükle
   const savedUser = localStorage.getItem('womenai_user');
   if (savedUser) {
