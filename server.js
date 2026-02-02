@@ -18,7 +18,21 @@
       
       // Önce environment variable'dan dene (Coolify için)
       if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+        let envValue = process.env.FIREBASE_SERVICE_ACCOUNT;
+        
+        // Coolify bazen başa/sona tırnak ekleyebiliyor, temizle
+        envValue = envValue.trim();
+        if (envValue.startsWith('"') && envValue.endsWith('"')) {
+          envValue = envValue.slice(1, -1);
+        }
+        if (envValue.startsWith("'") && envValue.endsWith("'")) {
+          envValue = envValue.slice(1, -1);
+        }
+        
+        // Escaped newline'ları gerçek newline'a çevir
+        envValue = envValue.replace(/\\n/g, '\n');
+        
+        serviceAccount = JSON.parse(envValue);
         console.log('📦 Firebase config: Environment variable');
       } else {
         // Yoksa dosyadan oku (local development için)
