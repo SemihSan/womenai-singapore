@@ -56,6 +56,13 @@
         console.log('🔍 Parse edilecek ilk 50 char:', envValue.substring(0, 50));
         
         serviceAccount = JSON.parse(envValue);
+        
+        // Coolify private_key içindeki \n'leri literal string olarak bırakıyor
+        // PEM format için gerçek newline'lara çevirmemiz lazım
+        if (serviceAccount.private_key && typeof serviceAccount.private_key === 'string') {
+          serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+        }
+        
         console.log('📦 Firebase config: Environment variable');
       } else {
         // Yoksa dosyadan oku (local development için)
