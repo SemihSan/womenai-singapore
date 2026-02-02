@@ -1,0 +1,134 @@
+# ========================================
+# WOMEN AI - GITIGNORE
+# Gizli bilgiler Git'e GİTMEMELİ!
+# ========================================
+
+# ----------------
+# 🔐 GİZLİ DOSYALAR (ÇOK ÖNEMLİ!)
+# ----------------
+
+# Environment variables - TÜM .env dosyaları
+.env
+.env.*
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.test
+*.env
+
+# Firebase Service Account (Private Key içeriyor!)
+firebase-service-account.json
+*-firebase-adminsdk-*.json
+serviceAccount.json
+service-account.json
+firebase-admin*.json
+
+# Google Cloud credentials
+credentials.json
+client_secret*.json
+google-credentials.json
+
+# SSL/TLS sertifikaları
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# API Keys dosyaları
+api-keys.json
+secrets.json
+config.secret.json
+
+# ----------------
+# 📦 DEPENDENCIES
+# ----------------
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.npm/
+.yarn/
+
+# ----------------
+# 📝 LOG DOSYALARI
+# ----------------
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# ----------------
+# 💻 IDE & EDITOR
+# ----------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# ----------------
+# 🖥️ İŞLETİM SİSTEMİ
+# ----------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ----------------
+# 🏗️ BUILD & DIST
+# ----------------
+dist/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+*.tsbuildinfo
+
+# ----------------
+# 🧪 TEST & COVERAGE
+# ----------------
+coverage/
+.nyc_output/
+*.lcov
+.jest/
+
+# ----------------
+# 🗄️ DATABASE
+# ----------------
+*.sqlite
+*.sqlite3
+*.db
+mongodb-data/
+data/
+
+# ----------------
+# 🔧 TEMP & MISC
+# ----------------
+tmp/
+temp/
+.tmp/
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# ----------------
+# 📱 MOBILE (PWA için)
+# ----------------
+.expo/
+*.apk
+*.ipa
+*.aab

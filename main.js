@@ -37,7 +37,24 @@ function getUserId() {
 // ========================================
 // GOOGLE AUTH MANAGEMENT
 // ========================================
+let isGoogleSignInProgress = false; // Çoklu tıklama koruması
+
 async function handleGoogleSignIn(response) {
+  if (isGoogleSignInProgress) {
+    console.log('⏳ Giriş işlemi zaten devam ediyor...');
+    return;
+  }
+  
+  isGoogleSignInProgress = true;
+  
+  // Butonları devre dışı bırak
+  const loginBtns = document.querySelectorAll('.google-login-btn-large, .google-login-btn');
+  loginBtns.forEach(btn => {
+    btn.disabled = true;
+    btn.style.opacity = '0.6';
+    btn.style.pointerEvents = 'none';
+  });
+  
   try {
     const res = await fetch('/api/auth/google', {
       method: 'POST',
@@ -69,6 +86,14 @@ async function handleGoogleSignIn(response) {
   } catch (err) {
     console.error('Google auth error:', err);
     alert('Giriş sırasında bir hata oluştu');
+  } finally {
+    isGoogleSignInProgress = false;
+    // Butonları tekrar aktif et
+    loginBtns.forEach(btn => {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.pointerEvents = 'auto';
+    });
   }
 }
 
@@ -92,9 +117,10 @@ async function migrateChatsToGoogleAccount(visitorId, googleUserId) {
 function handleGoogleSignOut() {
   currentUser = null;
   localStorage.removeItem('womenai_user');
-  updateUserUI();
-  updateLoginState(); // Giriş ekranını göster
   console.log('✅ Çıkış yapıldı');
+  
+  // Sayfayı yenile - Google Sign-In'i resetlemek için
+  window.location.reload();
 }
 
 // Giriş durumuna göre ekranları göster/gizle
@@ -104,6 +130,7 @@ function updateLoginState() {
   const sidebar = document.getElementById('sidebar');
   const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
   const mainContent = document.querySelector('.main-content');
+  const inputContainer = document.querySelector('.input-container');
 
   if (currentUser) {
     // Giriş yapılmış - chat alanını göster
@@ -114,6 +141,7 @@ function updateLoginState() {
       mobileMenuToggle.classList.remove('hidden');
     }
     if (mainContent) mainContent.classList.remove('login-active');
+    if (inputContainer) inputContainer.style.display = 'block';
   } else {
     // Giriş yapılmamış - login ekranını göster
     if (loginScreen) loginScreen.style.display = 'flex';
@@ -123,6 +151,7 @@ function updateLoginState() {
       mobileMenuToggle.classList.add('hidden');
     }
     if (mainContent) mainContent.classList.add('login-active');
+    if (inputContainer) inputContainer.style.display = 'none';
   }
 }
 
@@ -137,7 +166,24 @@ function updateUserUI() {
     // Giriş yapmış kullanıcı
     if (userGuest) userGuest.style.display = 'none';
     if (userProfile) userProfile.style.display = 'flex';
-    if (userAvatar) userAvatar.src = currentUser.picture || 'https://via.placeholder.com/40';
+    // Default avatar - data URI SVG
+    const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0iI0M0NUM3QyI+PGNpcmNsZSBjeD0iMjAiIGN5PSIxNSIgcj0iOCIgZmlsbD0iI0U4QTBCNSIvPjxwYXRoIGQ9Ik0zNSAzOGMwLTguMjg0LTYuNzE2LTE1LTE1LTE1cy0xNSA2LjcxNi0xNSAxNSIgZmlsbD0iI0U4QTBCNSIvPjwvc3ZnPg==';
+    
+    // Avatar URL'sini doğrula - sadece güvenilir kaynaklardan gelen URL'leri kabul et
+    const isValidAvatarUrl = (url) => {
+      if (!url || typeof url !== 'string') return false;
+      // Google ve diğer güvenilir kaynakları kabul et
+      const trustedDomains = ['googleusercontent.com', 'google.com', 'gstatic.com', 'gravatar.com'];
+      try {
+        const urlObj = new URL(url);
+        return trustedDomains.some(domain => urlObj.hostname.endsWith(domain));
+      } catch {
+        return false;
+      }
+    };
+    
+    const avatarUrl = isValidAvatarUrl(currentUser.picture) ? currentUser.picture : defaultAvatar;
+    if (userAvatar) userAvatar.src = avatarUrl;
     if (userName) userName.textContent = currentUser.name || 'Kullanıcı';
     if (userEmail) userEmail.textContent = currentUser.email || '';
   } else {
@@ -166,10 +212,21 @@ function initGoogleAuth() {
   // Google Sign-In butonu event listener (sidebar'daki)
   const googleLoginBtn = document.getElementById('google-login-btn');
   if (googleLoginBtn) {
-    googleLoginBtn.addEventListener('click', () => {
+    googleLoginBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (isGoogleSignInProgress) return;
+      
       // Google One Tap / Sign-In popup
       if (window.google && window.google.accounts) {
-        google.accounts.id.prompt();
+        google.accounts.id.prompt((notification) => {
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            console.log('Google prompt gösterilmedi, popup deneyelim');
+            // One Tap gösterilemezse bilgi ver
+            if (notification.getNotDisplayedReason() === 'opt_out_or_no_session') {
+              alert('Google hesabınızla giriş yapmak için tarayıcınızda Google hesabına giriş yapın.');
+            }
+          }
+        });
       } else {
         alert('Google Sign-In yüklenemedi. Sayfayı yenileyin.');
       }
@@ -179,9 +236,19 @@ function initGoogleAuth() {
   // Ana giriş ekranındaki Google butonu
   const googleLoginBtnMain = document.getElementById('google-login-btn-main');
   if (googleLoginBtnMain) {
-    googleLoginBtnMain.addEventListener('click', () => {
+    googleLoginBtnMain.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (isGoogleSignInProgress) return;
+      
       if (window.google && window.google.accounts) {
-        google.accounts.id.prompt();
+        google.accounts.id.prompt((notification) => {
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            console.log('Google prompt gösterilmedi:', notification.getNotDisplayedReason());
+            if (notification.getNotDisplayedReason() === 'opt_out_or_no_session') {
+              alert('Google hesabınızla giriş yapmak için tarayıcınızda Google hesabına giriş yapın.');
+            }
+          }
+        });
       } else {
         alert('Google Sign-In yüklenemedi. Sayfayı yenileyin.');
       }
@@ -216,9 +283,208 @@ async function fetchGoogleClientId() {
     } else if (!clientId) {
       console.warn('⚠️ Google Client ID yapılandırılmamış');
     }
+
+    // Firebase Push Notification başlat
+    if (config.firebase && config.firebase.apiKey) {
+      await initPushNotifications(config);
+    }
   } catch (err) {
-    console.error('Google Client ID alınamadı:', err);
+    console.error('Config alınamadı:', err);
   }
+}
+
+// ========================================
+// PUSH NOTIFICATIONS
+// ========================================
+let fcmToken = null;
+let pushEnabled = false;
+
+async function initPushNotifications(config) {
+  try {
+    // Service Worker'ı kaydet
+    if (!('serviceWorker' in navigator)) {
+      console.warn('⚠️ Service Worker desteklenmiyor');
+      return;
+    }
+
+    if (!('PushManager' in window)) {
+      console.warn('⚠️ Push bildirimleri desteklenmiyor');
+      return;
+    }
+
+    // Firebase initialize
+    if (!firebase.apps.length) {
+      firebase.initializeApp(config.firebase);
+    }
+    
+    const messaging = firebase.messaging();
+
+    // Service Worker kaydet
+    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    console.log('✅ Push SW kaydedildi');
+
+    // SW'ye Firebase config gönder
+    if (registration.active) {
+      registration.active.postMessage({
+        type: 'FIREBASE_CONFIG',
+        config: config.firebase
+      });
+    }
+
+    // Mevcut izin durumunu kontrol et
+    const permission = Notification.permission;
+    
+    if (permission === 'granted') {
+      // İzin zaten var, token al
+      await getAndSaveToken(messaging, config.vapidKey, registration);
+    } else if (permission === 'default') {
+      // İzin henüz sorulmamış, UI göster
+      showNotificationPrompt();
+    }
+
+    // Ön plandayken gelen mesajları dinle
+    messaging.onMessage((payload) => {
+      console.log('📬 Ön plan bildirimi:', payload);
+      
+      // Custom bildirim göster
+      showInAppNotification(payload.notification?.title, payload.notification?.body);
+    });
+
+    console.log('✅ Push Notifications hazır');
+  } catch (err) {
+    console.error('Push init error:', err);
+  }
+}
+
+async function getAndSaveToken(messaging, vapidKey, registration) {
+  try {
+    fcmToken = await messaging.getToken({
+      vapidKey: vapidKey,
+      serviceWorkerRegistration: registration
+    });
+
+    if (fcmToken) {
+      console.log('✅ FCM Token alındı');
+      pushEnabled = true;
+      
+      // Token'ı server'a kaydet
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: getUserId(),
+          fcmToken: fcmToken,
+        }),
+      });
+
+      // UI güncelle
+      updateNotificationUI(true);
+    }
+  } catch (err) {
+    console.error('Token alınamadı:', err);
+  }
+}
+
+async function requestNotificationPermission() {
+  try {
+    const permission = await Notification.requestPermission();
+    
+    if (permission === 'granted') {
+      console.log('✅ Bildirim izni verildi');
+      
+      // Config'i tekrar al ve token al
+      const response = await fetch('/api/config');
+      const config = await response.json();
+      
+      if (config.firebase && config.firebase.apiKey) {
+        const messaging = firebase.messaging();
+        const registration = await navigator.serviceWorker.ready;
+        await getAndSaveToken(messaging, config.vapidKey, registration);
+      }
+      
+      hideNotificationPrompt();
+    } else {
+      console.log('❌ Bildirim izni reddedildi');
+      hideNotificationPrompt();
+    }
+  } catch (err) {
+    console.error('İzin hatası:', err);
+  }
+}
+
+async function disableNotifications() {
+  try {
+    if (fcmToken) {
+      await fetch('/api/push/unsubscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fcmToken }),
+      });
+    }
+    
+    pushEnabled = false;
+    fcmToken = null;
+    updateNotificationUI(false);
+    console.log('✅ Bildirimler kapatıldı');
+  } catch (err) {
+    console.error('Bildirim kapatma hatası:', err);
+  }
+}
+
+function showNotificationPrompt() {
+  // Bildirim izni isteme UI'ı göster
+  const prompt = document.getElementById('notification-prompt');
+  if (prompt) {
+    prompt.style.display = 'flex';
+  }
+}
+
+function hideNotificationPrompt() {
+  const prompt = document.getElementById('notification-prompt');
+  if (prompt) {
+    prompt.style.display = 'none';
+  }
+}
+
+function updateNotificationUI(enabled) {
+  const btn = document.getElementById('notification-toggle');
+  if (btn) {
+    btn.textContent = enabled ? '🔔 Bildirimler Açık' : '🔕 Bildirimleri Aç';
+    btn.classList.toggle('active', enabled);
+  }
+}
+
+function showInAppNotification(title, body) {
+  // Uygulama içi bildirim toast
+  const toast = document.createElement('div');
+  toast.className = 'notification-toast';
+  toast.innerHTML = `
+    <div class="notification-toast-icon">💜</div>
+    <div class="notification-toast-content">
+      <div class="notification-toast-title">${title || 'Women AI'}</div>
+      <div class="notification-toast-body">${body || ''}</div>
+    </div>
+    <button class="notification-toast-close">&times;</button>
+  `;
+  
+  document.body.appendChild(toast);
+  
+  // Animasyon ile göster
+  setTimeout(() => toast.classList.add('show'), 10);
+  
+  // Kapatma butonu
+  toast.querySelector('.notification-toast-close').addEventListener('click', () => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  });
+  
+  // 5 saniye sonra otomatik kapat
+  setTimeout(() => {
+    if (toast.parentNode) {
+      toast.classList.remove('show');
+      setTimeout(() => toast.remove(), 300);
+    }
+  }, 5000);
 }
 
 // DOM Elements

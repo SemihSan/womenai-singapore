@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0, user-scalable=yes, interactive-widget=resizes-content">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Women AI - Kadınlar İçin Yapay Zeka Asistanı</title>
   <meta name="description" content="Cilt bakımı, beslenme, motivasyon ve daha fazlası için kişisel yapay zeka asistanınız. Women AI ile kendinize özel tavsiyeler alın.">
@@ -38,6 +38,10 @@
   
   <!-- Google Sign-In -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  
+  <!-- Firebase SDK for Push Notifications -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
 </head>
 <body>
   <div class="app-container">
@@ -135,7 +139,7 @@
           <!-- Giriş yapmış kullanıcı için -->
           <div class="user-profile" id="user-profile" style="display: none;">
             <div class="user-info">
-              <img class="user-avatar" id="user-avatar" src="" alt="Profil">
+              <img class="user-avatar" id="user-avatar" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0iI0M0NUM3QyI+PGNpcmNsZSBjeD0iMjAiIGN5PSIxNSIgcj0iOCIgZmlsbD0iI0U4QTBCNSIvPjxwYXRoIGQ9Ik0zNSAzOGMwLTguMjg0LTYuNzE2LTE1LTE1LTE1cy0xNSA2LjcxNi0xNSAxNSIgZmlsbD0iI0U4QTBCNSIvPjwvc3ZnPg==" alt="Profil">
               <div class="user-details">
                 <span class="user-name" id="user-name">Kullanıcı</span>
                 <span class="user-email" id="user-email">email@example.com</span>
@@ -261,6 +265,7 @@
           <div class="input-hint">Women AI yanılabilir. Önemli bilgileri doğrulamayı unutma.</div>
         </div>
       </div>
+    </div>
     </main>
 
     <!-- Weather Modal -->
@@ -298,6 +303,21 @@
             </svg>
             Yenile
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Permission Prompt -->
+    <div class="notification-prompt" id="notification-prompt" style="display: none;">
+      <div class="notification-prompt-content">
+        <div class="notification-prompt-icon">🔔</div>
+        <div class="notification-prompt-text">
+          <h3>Bildirimleri Aç</h3>
+          <p>Cilt bakım hatırlatmaları, motivasyon mesajları ve su içme bildirimleri almak ister misin?</p>
+        </div>
+        <div class="notification-prompt-buttons">
+          <button class="notification-prompt-btn allow" onclick="requestNotificationPermission()">İzin Ver</button>
+          <button class="notification-prompt-btn deny" onclick="hideNotificationPrompt()">Şimdi Değil</button>
         </div>
       </div>
     </div>

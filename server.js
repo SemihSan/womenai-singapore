@@ -8,6 +8,33 @@
     const helmet = require('helmet');
     const crypto = require('crypto');
     const bcrypt = require('bcryptjs');
+    const admin = require('firebase-admin');
+    const path = require('path');
+
+    // Firebase Admin SDK Initialize
+    let firebaseInitialized = false;
+    try {
+      let serviceAccount;
+      
+      // Önce environment variable'dan dene (Coolify için)
+      if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+        console.log('📦 Firebase config: Environment variable');
+      } else {
+        // Yoksa dosyadan oku (local development için)
+        const serviceAccountPath = path.join(__dirname, 'firebase-service-account.json');
+        serviceAccount = require(serviceAccountPath);
+        console.log('📦 Firebase config: JSON dosyası');
+      }
+      
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+      firebaseInitialized = true;
+      console.log('✅ Firebase Admin SDK initialized');
+    } catch (err) {
+      console.warn('⚠️ Firebase Admin SDK yüklenemedi:', err.message);
+    }
 
     const IS_PRODUCTION = process.env.NODE_ENV === 'production';
     const ALLOWED_ADMIN_SHOPS = (process.env.ALLOWED_ADMIN_SHOPS || '').split(',').filter(Boolean);
@@ -220,6 +247,35 @@
     });
 
     const User = mongoose.model('User', userSchema);
+
+    /* =========================================================
+      2.4) Push Subscription Schema (Bildirim abonelikleri)
+      ========================================================= */
+    const pushSubscriptionSchema = new mongoose.Schema({
+      userId: { type: String, required: true, index: true }, // google_xxx veya visitor_xxx
+      fcmToken: { type: String, required: true, unique: true },
+      device: { type: String, default: 'web' }, // web, android, ios
+      userAgent: { type: String },
+      // Bildirim tercihleri
+      preferences: {
+        skincare: { type: Boolean, default: true }, // Cilt bakımı hatırlatıcı
+        water: { type: Boolean, default: true }, // Su içme hatırlatıcı
+        motivation: { type: Boolean, default: true }, // Motivasyon bildirimleri
+        news: { type: Boolean, default: true }, // Yeni özellik duyuruları
+      },
+      // Hatırlatma saatleri
+      reminderTimes: {
+        morning: { type: String, default: '08:00' }, // Sabah bakımı
+        evening: { type: String, default: '21:00' }, // Akşam bakımı
+        waterInterval: { type: Number, default: 2 }, // Saat aralığı
+      },
+      timezone: { type: String, default: 'Europe/Istanbul' },
+      isActive: { type: Boolean, default: true },
+      createdAt: { type: Date, default: Date.now },
+      lastNotification: { type: Date },
+    });
+
+    const PushSubscription = mongoose.model('PushSubscription', pushSubscriptionSchema);
 
     /* =========================================================
       3) Mini RAG - ürünler
@@ -991,11 +1047,246 @@
       }
     });
 
-    // Frontend için config (Google Client ID vb.)
+    // Frontend için config (Google Client ID, Firebase vb.)
     app.get('/api/config', (req, res) => {
       res.json({
         googleClientId: process.env.GOOGLE_CLIENT_ID || null,
+        firebase: {
+          apiKey: process.env.FIREBASE_API_KEY || null,
+          authDomain: process.env.FIREBASE_AUTH_DOMAIN || null,
+          projectId: process.env.FIREBASE_PROJECT_ID || null,
+          storageBucket: process.env.FIREBASE_STORAGE_BUCKET || null,
+          messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || null,
+          appId: process.env.FIREBASE_APP_ID || null,
+        },
+        vapidKey: process.env.FIREBASE_VAPID_KEY || null,
       });
+    });
+
+    /* =========================================================
+      8.1) PUSH NOTIFICATION API
+      ========================================================= */
+
+    // Push subscription kaydet
+    app.post('/api/push/subscribe', async (req, res) => {
+      try {
+        const { userId, fcmToken, preferences, reminderTimes, timezone } = req.body;
+
+        if (!userId || !fcmToken) {
+          return res.status(400).json({ error: 'userId ve fcmToken gerekli' });
+        }
+
+        // Mevcut subscription'ı güncelle veya yeni oluştur
+        const subscription = await PushSubscription.findOneAndUpdate(
+          { fcmToken },
+          {
+            userId,
+            fcmToken,
+            userAgent: req.headers['user-agent'],
+            preferences: preferences || {},
+            reminderTimes: reminderTimes || {},
+            timezone: timezone || 'Europe/Istanbul',
+            isActive: true,
+          },
+          { upsert: true, new: true }
+        );
+
+        console.log(`✅ Push subscription kaydedildi: ${userId}`);
+        res.json({ success: true, subscriptionId: subscription._id });
+      } catch (err) {
+        console.error('Push subscribe error:', err);
+        res.status(500).json({ error: 'Subscription kaydedilemedi' });
+      }
+    });
+
+    // Push subscription sil (bildirim kapatma)
+    app.post('/api/push/unsubscribe', async (req, res) => {
+      try {
+        const { fcmToken } = req.body;
+
+        if (!fcmToken) {
+          return res.status(400).json({ error: 'fcmToken gerekli' });
+        }
+
+        await PushSubscription.findOneAndUpdate(
+          { fcmToken },
+          { isActive: false }
+        );
+
+        console.log('✅ Push subscription devre dışı bırakıldı');
+        res.json({ success: true });
+      } catch (err) {
+        console.error('Push unsubscribe error:', err);
+        res.status(500).json({ error: 'İşlem başarısız' });
+      }
+    });
+
+    // Kullanıcının bildirim tercihlerini güncelle
+    app.put('/api/push/preferences', async (req, res) => {
+      try {
+        const { userId, preferences, reminderTimes } = req.body;
+
+        if (!userId) {
+          return res.status(400).json({ error: 'userId gerekli' });
+        }
+
+        const update = {};
+        if (preferences) update.preferences = preferences;
+        if (reminderTimes) update.reminderTimes = reminderTimes;
+
+        await PushSubscription.updateMany({ userId, isActive: true }, update);
+
+        res.json({ success: true });
+      } catch (err) {
+        console.error('Push preferences error:', err);
+        res.status(500).json({ error: 'Tercihler güncellenemedi' });
+      }
+    });
+
+    // Kullanıcının bildirim tercihlerini getir
+    app.get('/api/push/preferences/:userId', async (req, res) => {
+      try {
+        const { userId } = req.params;
+
+        const subscription = await PushSubscription.findOne({ userId, isActive: true });
+
+        if (!subscription) {
+          return res.json({ 
+            enabled: false,
+            preferences: {
+              skincare: true,
+              water: true,
+              motivation: true,
+              news: true,
+            },
+            reminderTimes: {
+              morning: '08:00',
+              evening: '21:00',
+              waterInterval: 2,
+            }
+          });
+        }
+
+        res.json({
+          enabled: true,
+          preferences: subscription.preferences,
+          reminderTimes: subscription.reminderTimes,
+        });
+      } catch (err) {
+        console.error('Get preferences error:', err);
+        res.status(500).json({ error: 'Tercihler alınamadı' });
+      }
+    });
+
+    // Test bildirimi gönder (Admin veya kullanıcı kendine)
+    app.post('/api/push/test', async (req, res) => {
+      try {
+        const { fcmToken, title, body } = req.body;
+
+        if (!fcmToken) {
+          return res.status(400).json({ error: 'fcmToken gerekli' });
+        }
+
+        if (!firebaseInitialized) {
+          return res.status(500).json({ error: 'Firebase yapılandırılmamış' });
+        }
+
+        // Firebase Admin SDK ile bildirim gönder
+        const message = {
+          token: fcmToken,
+          notification: {
+            title: title || '💜 Women AI',
+            body: body || 'Test bildirimi başarılı!',
+          },
+          webpush: {
+            notification: {
+              icon: '/favicon.svg',
+              badge: '/favicon.svg',
+            },
+          },
+          data: {
+            type: 'test',
+            timestamp: String(Date.now()),
+          },
+        };
+
+        const result = await admin.messaging().send(message);
+        console.log('📬 Test bildirimi gönderildi:', result);
+
+        res.json({ success: true, message: 'Bildirim gönderildi', messageId: result });
+      } catch (err) {
+        console.error('Push test error:', err);
+        res.status(500).json({ error: 'Bildirim gönderilemedi', details: err.message });
+      }
+    });
+
+    // Toplu bildirim gönder (Admin only)
+    app.post('/api/push/broadcast', adminAuthMiddleware, async (req, res) => {
+      try {
+        const { title, body, type = 'news' } = req.body;
+
+        if (!title || !body) {
+          return res.status(400).json({ error: 'title ve body gerekli' });
+        }
+
+        if (!firebaseInitialized) {
+          return res.status(500).json({ error: 'Firebase yapılandırılmamış' });
+        }
+
+        // İlgili tercihi açık olan subscription'ları bul
+        const preferenceField = `preferences.${type}`;
+        const subscriptions = await PushSubscription.find({
+          isActive: true,
+          [preferenceField]: true,
+        });
+
+        if (subscriptions.length === 0) {
+          return res.json({ success: true, sent: 0, message: 'Gönderilecek abone yok' });
+        }
+
+        // Tüm token'lara gönder (Firebase Admin SDK multicast)
+        const tokens = subscriptions.map(s => s.fcmToken);
+        
+        const message = {
+          notification: {
+            title,
+            body,
+          },
+          webpush: {
+            notification: {
+              icon: '/favicon.svg',
+              badge: '/favicon.svg',
+            },
+          },
+          data: { type, timestamp: String(Date.now()) },
+        };
+
+        // Multicast gönder (max 500 token per batch)
+        let successCount = 0;
+        let failureCount = 0;
+        
+        for (let i = 0; i < tokens.length; i += 500) {
+          const batch = tokens.slice(i, i + 500);
+          const response = await admin.messaging().sendEachForMulticast({
+            tokens: batch,
+            ...message,
+          });
+          successCount += response.successCount;
+          failureCount += response.failureCount;
+        }
+
+        console.log(`📬 Toplu bildirim: ${successCount}/${tokens.length} başarılı`);
+
+        res.json({ 
+          success: true, 
+          sent: successCount, 
+          failed: failureCount,
+          total: tokens.length 
+        });
+      } catch (err) {
+        console.error('Broadcast error:', err);
+        res.status(500).json({ error: 'Toplu bildirim gönderilemedi' });
+      }
     });
 
     /* =========================================================
