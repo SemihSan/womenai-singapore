@@ -1558,12 +1558,10 @@
           return res.status(500).json({ error: 'Firebase yapılandırılmamış' });
         }
 
-        // İlgili tercihi açık olan subscription'ları bul
-        const preferenceField = `preferences.${type}`;
-        const subscriptions = await PushSubscription.find({
-          isActive: true,
-          [preferenceField]: true,
-        });
+        // Tüm aktif subscription'ları bul (preference filtresi kaldırıldı)
+        const subscriptions = await PushSubscription.find({ isActive: true });
+        
+        console.log(`📊 Broadcast: ${subscriptions.length} aktif abone bulundu`);
 
         if (subscriptions.length === 0) {
           return res.json({ success: true, successCount: 0, failureCount: 0, message: 'Gönderilecek abone yok' });
