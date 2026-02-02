@@ -20,17 +20,37 @@
       if (process.env.FIREBASE_SERVICE_ACCOUNT) {
         let envValue = process.env.FIREBASE_SERVICE_ACCOUNT;
         
+        // Debug: İlk 50 karakteri göster
+        console.log('🔍 Firebase env ilk 50 char:', envValue.substring(0, 50));
+        console.log('🔍 Firebase env ilk char code:', envValue.charCodeAt(0));
+        
         // Coolify bazen başa/sona tırnak ekleyebiliyor, temizle
         envValue = envValue.trim();
-        if (envValue.startsWith('"') && envValue.endsWith('"')) {
-          envValue = envValue.slice(1, -1);
-        }
-        if (envValue.startsWith("'") && envValue.endsWith("'")) {
+        
+        // Çift tırnak temizle (nested olabilir)
+        while ((envValue.startsWith('"') && envValue.endsWith('"')) || 
+               (envValue.startsWith("'") && envValue.endsWith("'"))) {
           envValue = envValue.slice(1, -1);
         }
         
-        // Escaped newline'ları gerçek newline'a çevir
-        envValue = envValue.replace(/\\n/g, '\n');
+        // Escaped karakterleri düzelt
+        envValue = envValue.replace(/\\"/g, '"'); // \" -> "
+        envValue = envValue.replace(/\\n/g, '\n'); // \n -> newline
+        
+        // Base64 encoded olabilir mi kontrol et
+        if (!envValue.startsWith('{')) {
+          try {
+            const decoded = Buffer.from(envValue, 'base64').toString('utf8');
+            if (decoded.startsWith('{')) {
+              envValue = decoded;
+              console.log('📦 Firebase config: Base64 decoded');
+            }
+          } catch (e) {
+            // Base64 değil, devam et
+          }
+        }
+        
+        console.log('🔍 Parse edilecek ilk 50 char:', envValue.substring(0, 50));
         
         serviceAccount = JSON.parse(envValue);
         console.log('📦 Firebase config: Environment variable');
