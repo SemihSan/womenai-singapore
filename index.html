@@ -118,6 +118,50 @@
             <polyline points="9 18 15 12 9 6"></polyline>
           </svg>
         </div>
+
+        <!-- Hatırlatıcı Ayarları -->
+        <div class="sidebar-section reminder-settings" id="reminder-settings" style="display: none;">
+          <h4>⏰ Hatırlatıcı Ayarları</h4>
+          
+          <!-- Cilt Bakımı -->
+          <div class="reminder-group">
+            <label>
+              <input type="checkbox" id="skincare-reminder-toggle">
+              🧴 Cilt Bakımı Hatırlatıcısı
+            </label>
+            <div class="reminder-times hidden" id="skincare-times">
+              <div class="time-input-group">
+                <span>Sabah:</span>
+                <input type="time" id="skincare-morning-time" value="07:00">
+              </div>
+              <div class="time-input-group">
+                <span>Akşam:</span>
+                <input type="time" id="skincare-evening-time" value="21:00">
+              </div>
+            </div>
+          </div>
+          
+          <!-- Su İçme -->
+          <div class="reminder-group">
+            <label>
+              <input type="checkbox" id="water-reminder-toggle">
+              💧 Su İçme Hatırlatıcısı
+            </label>
+            <div class="reminder-times hidden" id="water-times">
+              <div class="time-input-group">
+                <span>Her:</span>
+                <select id="water-interval">
+                  <option value="1">1 saat</option>
+                  <option value="2" selected>2 saat</option>
+                  <option value="3">3 saat</option>
+                  <option value="4">4 saat</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          
+          <button id="save-reminder-settings">💾 Kaydet</button>
+        </div>
       </div>
 
       <div class="sidebar-footer">
@@ -323,6 +367,6 @@
     </div>
   </div>
 
-  <script src="main.js?v=2.6"></script>
+  <script src="main.js?v=2.7"></script>
 </body>
 </html>

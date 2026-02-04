@@ -2146,3 +2146,112 @@ body {
     transform: translateY(0);
   }
 }
+
+/* ========================================
+   REMINDER SETTINGS (Hatırlatıcı Ayarları)
+   ======================================== */
+.reminder-settings {
+  padding: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.reminder-settings h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reminder-group {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.reminder-group label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.reminder-group label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent-rose);
+  cursor: pointer;
+}
+
+.reminder-times {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+}
+
+.reminder-times.hidden {
+  display: none;
+}
+
+.time-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.time-input-group span {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 50px;
+}
+
+.time-input-group input[type="time"],
+.time-input-group select {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.time-input-group input[type="time"]:focus,
+.time-input-group select:focus {
+  outline: none;
+  border-color: var(--accent-rose);
+}
+
+#save-reminder-settings {
+  width: 100%;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, var(--accent-rose), var(--accent-purple));
+  border: none;
+  border-radius: var(--radius-md);
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-top: 8px;
+}
+
+#save-reminder-settings:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+#save-reminder-settings:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}

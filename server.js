@@ -10,6 +10,7 @@
     const bcrypt = require('bcryptjs');
     const admin = require('firebase-admin');
     const path = require('path');
+    const cron = require('node-cron');
 
     // Firebase Admin SDK Initialize
     let firebaseInitialized = false;
@@ -1344,20 +1345,20 @@
       }
     });
 
-    // Kullanıcının bildirim tercihlerini güncelle
+    // Kullanıcının bildirim tercihlerini güncelle (fcmToken ile)
     app.put('/api/push/preferences', async (req, res) => {
       try {
-        const { userId, preferences, reminderTimes } = req.body;
+        const { fcmToken, preferences, reminderTimes } = req.body;
 
-        if (!userId) {
-          return res.status(400).json({ error: 'userId gerekli' });
+        if (!fcmToken) {
+          return res.status(400).json({ error: 'fcmToken gerekli' });
         }
 
         const update = {};
         if (preferences) update.preferences = preferences;
         if (reminderTimes) update.reminderTimes = reminderTimes;
 
-        await PushSubscription.updateMany({ userId, isActive: true }, update);
+        await PushSubscription.updateOne({ fcmToken, isActive: true }, update);
 
         res.json({ success: true });
       } catch (err) {
@@ -1366,7 +1367,46 @@
       }
     });
 
-    // Kullanıcının bildirim tercihlerini getir
+    // Kullanıcının bildirim tercihlerini getir (fcmToken ile)
+    app.get('/api/push/preferences', async (req, res) => {
+      try {
+        const { fcmToken } = req.query;
+
+        if (!fcmToken) {
+          return res.status(400).json({ error: 'fcmToken gerekli' });
+        }
+
+        const subscription = await PushSubscription.findOne({ fcmToken, isActive: true });
+
+        if (!subscription) {
+          return res.json({ 
+            enabled: false,
+            preferences: {
+              skincare: true,
+              water: true,
+              motivation: true,
+              news: true,
+            },
+            reminderTimes: {
+              morning: '08:00',
+              evening: '21:00',
+              waterInterval: 2,
+            }
+          });
+        }
+
+        res.json({
+          enabled: true,
+          preferences: subscription.preferences,
+          reminderTimes: subscription.reminderTimes,
+        });
+      } catch (err) {
+        console.error('Get preferences error:', err);
+        res.status(500).json({ error: 'Tercihler alınamadı' });
+      }
+    });
+
+    // Kullanıcının bildirim tercihlerini getir (userId ile - legacy)
     app.get('/api/push/preferences/:userId', async (req, res) => {
       try {
         const { userId } = req.params;
@@ -2075,7 +2115,226 @@
     // Health
     app.get('/health', (req, res) => res.json({ ok: true }));
 
-    app.listen(PORT, () => {
-      console.log(`🚀 Kadın AI Asistanı backend ${PORT} portunda dinliyor`);
+    /* =========================================================
+      HATIRLATICI SİSTEMİ (Scheduler)
+      ========================================================= */
+
+    // Hatırlatıcı mesajları
+    const REMINDER_MESSAGES = {
+      skincare: {
+        morning: [
+          { title: '☀️ Günaydın!', body: 'Sabah bakım rutinine başla! Temizle, tonla, nemlendir 💜' },
+          { title: '🌸 Güne güzel başla!', body: 'Cildine sabah bakımını yaptın mı?' },
+          { title: '✨ Işıltılı bir güne!', body: 'Güneş kremi sürmeni unutma! SPF şart ☀️' },
+        ],
+        evening: [
+          { title: '🌙 İyi akşamlar!', body: 'Makyajını temizle, gece serumunu uygula 💜' },
+          { title: '😴 Uyumadan önce...', body: 'Gece bakım rutinini unutma! Cildin sana teşekkür edecek' },
+          { title: '🧴 Gece bakımı zamanı!', body: 'Temizle + serum + nemlendirici. Güzellik uykusu başlasın!' },
+        ],
+      },
+      water: [
+        { title: '💧 Su molası!', body: 'Bir bardak su iç, cildin parlasın!' },
+        { title: '🚰 Hatırlatma!', body: 'Su içmeyi unutma! Günde 8 bardak hedefi 💪' },
+        { title: '💦 Hidrasyon zamanı!', body: 'Vücudun suya ihtiyaç duyuyor, iç biraz!' },
+        { title: '🥤 Su iç!', body: 'Güzel cilt = bol su. Hadi bir bardak!' },
+      ],
+    };
+
+    // Rastgele mesaj seç
+    function getRandomMessage(messages) {
+      return messages[Math.floor(Math.random() * messages.length)];
+    }
+
+    // Belirli saatte bildirim gönder
+    async function sendScheduledNotifications(type, timeField) {
+      if (!firebaseInitialized) {
+        console.log('⚠️ Firebase hazır değil, bildirim gönderilemedi');
+        return;
+      }
+
+      try {
+        const now = new Date();
+        const currentHour = now.getHours().toString().padStart(2, '0');
+        const currentMinute = now.getMinutes().toString().padStart(2, '0');
+        const currentTime = `${currentHour}:${currentMinute}`;
+
+        // Bu saatte bildirim alması gereken kullanıcıları bul
+        const query = {
+          isActive: true,
+          [`preferences.${type}`]: true,
+        };
+
+        if (timeField) {
+          // Tam saat eşleşmesi (örn: 08:00)
+          query[`reminderTimes.${timeField}`] = currentTime;
+        }
+
+        const subscriptions = await PushSubscription.find(query);
+
+        if (subscriptions.length === 0) {
+          return;
+        }
+
+        console.log(`⏰ ${type} hatırlatıcı: ${subscriptions.length} kullanıcıya gönderiliyor (${currentTime})`);
+
+        // Mesaj seç
+        let message;
+        if (type === 'skincare') {
+          const period = timeField === 'morning' ? 'morning' : 'evening';
+          message = getRandomMessage(REMINDER_MESSAGES.skincare[period]);
+        } else if (type === 'water') {
+          message = getRandomMessage(REMINDER_MESSAGES.water);
+        }
+
+        if (!message) return;
+
+        // Her kullanıcıya gönder
+        const tokens = subscriptions.map(s => s.fcmToken);
+        
+        for (let i = 0; i < tokens.length; i += 500) {
+          const batch = tokens.slice(i, i + 500);
+          try {
+            const response = await admin.messaging().sendEachForMulticast({
+              tokens: batch,
+              notification: {
+                title: message.title,
+                body: message.body,
+              },
+              webpush: {
+                notification: {
+                  icon: '/favicon.svg',
+                  badge: '/favicon.svg',
+                },
+                fcmOptions: {
+                  link: '/',
+                },
+              },
+              data: {
+                type: 'reminder',
+                reminderType: type,
+              },
+            });
+            console.log(`📬 ${type} hatırlatıcı: ${response.successCount}/${batch.length} başarılı`);
+          } catch (err) {
+            console.error(`❌ ${type} hatırlatıcı gönderim hatası:`, err.message);
+          }
+        }
+
+        // Son bildirim zamanını güncelle
+        await PushSubscription.updateMany(
+          { fcmToken: { $in: tokens } },
+          { lastNotification: new Date() }
+        );
+
+      } catch (err) {
+        console.error(`❌ ${type} scheduler hatası:`, err);
+      }
+    }
+
+    // Su hatırlatıcısı (her 2 saatte)
+    async function sendWaterReminders() {
+      if (!firebaseInitialized) return;
+
+      try {
+        const now = new Date();
+        const currentHour = now.getHours();
+
+        // Sadece gündüz saatlerinde (07:00 - 22:00)
+        if (currentHour < 7 || currentHour > 22) {
+          return;
+        }
+
+        // Su hatırlatıcısı açık olan kullanıcıları bul
+        const subscriptions = await PushSubscription.find({
+          isActive: true,
+          'preferences.water': true,
+        });
+
+        if (subscriptions.length === 0) return;
+
+        // Her kullanıcının interval'ına göre filtrele
+        const eligibleSubscriptions = subscriptions.filter(sub => {
+          const interval = sub.reminderTimes?.waterInterval || 2;
+          // Son bildirimden bu yana yeterli süre geçti mi?
+          if (sub.lastNotification) {
+            const hoursSinceLastNotification = (now - sub.lastNotification) / (1000 * 60 * 60);
+            return hoursSinceLastNotification >= interval;
+          }
+          return true; // Hiç bildirim almamışsa gönder
+        });
+
+        if (eligibleSubscriptions.length === 0) return;
+
+        console.log(`💧 Su hatırlatıcı: ${eligibleSubscriptions.length} kullanıcıya gönderiliyor`);
+
+        const message = getRandomMessage(REMINDER_MESSAGES.water);
+        const tokens = eligibleSubscriptions.map(s => s.fcmToken);
+
+        for (let i = 0; i < tokens.length; i += 500) {
+          const batch = tokens.slice(i, i + 500);
+          try {
+            const response = await admin.messaging().sendEachForMulticast({
+              tokens: batch,
+              notification: {
+                title: message.title,
+                body: message.body,
+              },
+              webpush: {
+                notification: {
+                  icon: '/favicon.svg',
+                  badge: '/favicon.svg',
+                },
+              },
+              data: {
+                type: 'reminder',
+                reminderType: 'water',
+              },
+            });
+            console.log(`💧 Su hatırlatıcı: ${response.successCount}/${batch.length} başarılı`);
+          } catch (err) {
+            console.error('❌ Su hatırlatıcı hatası:', err.message);
+          }
+        }
+
+        // Son bildirim zamanını güncelle
+        await PushSubscription.updateMany(
+          { fcmToken: { $in: tokens } },
+          { lastNotification: new Date() }
+        );
+
+      } catch (err) {
+        console.error('❌ Su scheduler hatası:', err);
+      }
+    }
+
+    // Cron Jobs başlat
+    function startReminderScheduler() {
+      console.log('⏰ Hatırlatıcı scheduler başlatılıyor...');
+
+      // Her dakika çalış - kullanıcının ayarladığı saatleri kontrol et
+      // Cilt bakımı sabah hatırlatıcısı (her dakika kontrol, eşleşen saatte gönder)
+      cron.schedule('* * * * *', () => {
+        sendScheduledNotifications('skincare', 'morning');
+        sendScheduledNotifications('skincare', 'evening');
+      });
+
+      // Su hatırlatıcısı - her saat başı (07:00 - 22:00 arası)
+      cron.schedule('0 7-22 * * *', () => {
+        sendWaterReminders();
+      });
+
+      console.log('✅ Hatırlatıcı scheduler aktif');
+      console.log('   📅 Cilt bakımı: Kullanıcının ayarladığı saatlerde');
+      console.log('   💧 Su içme: Her saat başı (07:00-22:00)');
+    }
+
+    // MongoDB bağlantısı başarılı olduktan sonra scheduler'ı başlat
+    mongoose.connection.once('open', () => {
+      if (firebaseInitialized) {
+        startReminderScheduler();
+      } else {
+        console.log('⚠️ Firebase hazır değil, scheduler başlatılmadı');
+      }
     });
 

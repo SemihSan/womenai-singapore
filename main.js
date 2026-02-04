@@ -529,6 +529,138 @@ function updateNotificationUI(enabled) {
     btn.textContent = enabled ? '🔔 Bildirimler Açık' : '🔕 Bildirimleri Aç';
     btn.classList.toggle('active', enabled);
   }
+  
+  // Reminder settings'i göster/gizle
+  const reminderSettings = document.getElementById('reminder-settings');
+  if (reminderSettings) {
+    reminderSettings.style.display = (enabled && currentUser) ? 'block' : 'none';
+    if (enabled && currentUser) {
+      loadReminderSettings();
+    }
+  }
+}
+
+// ========================================
+// REMINDER SETTINGS (Hatırlatıcı Ayarları)
+// ========================================
+async function loadReminderSettings() {
+  if (!fcmToken) return;
+  
+  try {
+    const response = await fetch(`/api/push/preferences?fcmToken=${encodeURIComponent(fcmToken)}`);
+    if (response.ok) {
+      const data = await response.json();
+      
+      // Skincare toggle ve zamanları ayarla
+      const skincareToggle = document.getElementById('skincare-reminder-toggle');
+      const skincareTimes = document.getElementById('skincare-times');
+      const morningTime = document.getElementById('skincare-morning-time');
+      const eveningTime = document.getElementById('skincare-evening-time');
+      
+      if (skincareToggle) {
+        skincareToggle.checked = data.preferences?.skincare || false;
+        if (skincareTimes) {
+          skincareTimes.classList.toggle('hidden', !skincareToggle.checked);
+        }
+      }
+      if (morningTime) morningTime.value = data.reminderTimes?.morning || '07:00';
+      if (eveningTime) eveningTime.value = data.reminderTimes?.evening || '21:00';
+      
+      // Water toggle ve interval ayarla
+      const waterToggle = document.getElementById('water-reminder-toggle');
+      const waterTimes = document.getElementById('water-times');
+      const waterInterval = document.getElementById('water-interval');
+      
+      if (waterToggle) {
+        waterToggle.checked = data.preferences?.water || false;
+        if (waterTimes) {
+          waterTimes.classList.toggle('hidden', !waterToggle.checked);
+        }
+      }
+      if (waterInterval) waterInterval.value = data.reminderTimes?.waterInterval || 2;
+      
+      console.log('✅ Hatırlatıcı ayarları yüklendi');
+    }
+  } catch (err) {
+    console.error('Hatırlatıcı ayarları yükleme hatası:', err);
+  }
+}
+
+async function saveReminderSettings() {
+  if (!fcmToken) {
+    showInAppNotification('Hata', 'Önce bildirimleri etkinleştirin');
+    return;
+  }
+  
+  const saveBtn = document.getElementById('save-reminder-settings');
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = '⏳ Kaydediliyor...';
+  }
+  
+  try {
+    const preferences = {
+      skincare: document.getElementById('skincare-reminder-toggle')?.checked || false,
+      water: document.getElementById('water-reminder-toggle')?.checked || false
+    };
+    
+    const reminderTimes = {
+      morning: document.getElementById('skincare-morning-time')?.value || '07:00',
+      evening: document.getElementById('skincare-evening-time')?.value || '21:00',
+      waterInterval: parseInt(document.getElementById('water-interval')?.value) || 2
+    };
+    
+    const response = await fetch('/api/push/preferences', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fcmToken,
+        preferences,
+        reminderTimes
+      })
+    });
+    
+    if (response.ok) {
+      showInAppNotification('✅ Kaydedildi', 'Hatırlatıcı ayarlarınız güncellendi');
+      console.log('✅ Hatırlatıcı ayarları kaydedildi');
+    } else {
+      throw new Error('Kayıt başarısız');
+    }
+  } catch (err) {
+    console.error('Hatırlatıcı kaydetme hatası:', err);
+    showInAppNotification('❌ Hata', 'Ayarlar kaydedilemedi');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = '💾 Kaydet';
+    }
+  }
+}
+
+function initReminderSettings() {
+  // Skincare toggle
+  const skincareToggle = document.getElementById('skincare-reminder-toggle');
+  const skincareTimes = document.getElementById('skincare-times');
+  if (skincareToggle && skincareTimes) {
+    skincareToggle.addEventListener('change', () => {
+      skincareTimes.classList.toggle('hidden', !skincareToggle.checked);
+    });
+  }
+  
+  // Water toggle
+  const waterToggle = document.getElementById('water-reminder-toggle');
+  const waterTimes = document.getElementById('water-times');
+  if (waterToggle && waterTimes) {
+    waterToggle.addEventListener('change', () => {
+      waterTimes.classList.toggle('hidden', !waterToggle.checked);
+    });
+  }
+  
+  // Save button
+  const saveBtn = document.getElementById('save-reminder-settings');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', saveReminderSettings);
+  }
 }
 
 function showInAppNotification(title, body) {
@@ -1087,6 +1219,7 @@ async function init() {
   initTheme();
   initMobileMenu();
   initEventListeners();
+  initReminderSettings(); // Hatırlatıcı ayarları
   initGoogleAuth(); // Google OAuth başlat (bu updateLoginState'i de çağırır)
   
   // Sadece giriş yapılmışsa sohbetleri yükle
