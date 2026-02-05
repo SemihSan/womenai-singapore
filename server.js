@@ -10,7 +10,15 @@
     const bcrypt = require('bcryptjs');
     const admin = require('firebase-admin');
     const path = require('path');
-    const cron = require('node-cron');
+    
+    // node-cron'u lazy load yap (optional dependency)
+    let cron = null;
+    try {
+      cron = require('node-cron');
+      console.log('✅ node-cron yüklendi');
+    } catch (err) {
+      console.log('⚠️ node-cron yüklenemedi, scheduler devre dışı:', err.message);
+    }
 
     // Firebase Admin SDK Initialize
     let firebaseInitialized = false;
@@ -2310,6 +2318,11 @@
 
     // Cron Jobs başlat
     function startReminderScheduler() {
+      if (!cron) {
+        console.log('⚠️ node-cron mevcut değil, scheduler başlatılmadı');
+        return;
+      }
+      
       console.log('⏰ Hatırlatıcı scheduler başlatılıyor...');
 
       // Her dakika çalış - kullanıcının ayarladığı saatleri kontrol et
@@ -2331,10 +2344,15 @@
 
     // MongoDB bağlantısı başarılı olduktan sonra scheduler'ı başlat
     mongoose.connection.once('open', () => {
-      if (firebaseInitialized) {
+      if (firebaseInitialized && cron) {
         startReminderScheduler();
       } else {
-        console.log('⚠️ Firebase hazır değil, scheduler başlatılmadı');
+        console.log('⚠️ Firebase veya cron hazır değil, scheduler başlatılmadı');
       }
+    });
+
+    // Start server
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Server is running on port ${PORT}`);
     });
 
