@@ -2255,3 +2255,252 @@ body {
   cursor: not-allowed;
   transform: none;
 }
+
+/* ========================================
+   PROFILE MODAL (Kullanıcı Profil Sayfası)
+   ======================================== */
+.profile-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.profile-modal {
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  width: 90%;
+  max-width: 420px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.profile-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.profile-modal-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.profile-modal-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: var(--bg-secondary);
+  border-radius: 50%;
+  font-size: 20px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+}
+
+.profile-modal-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.profile-modal-body {
+  padding: 24px;
+}
+
+/* Profil Kartı */
+.profile-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary));
+  border-radius: var(--radius-md);
+  margin-bottom: 24px;
+}
+
+.profile-card-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 3px solid var(--accent-rose);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.profile-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-card-info h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-card-info p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  background: linear-gradient(135deg, var(--accent-rose), var(--accent-purple));
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 20px;
+}
+
+/* İstatistikler */
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.profile-stat-item {
+  text-align: center;
+  padding: 14px 8px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.profile-stat-value {
+  display: block;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent-rose);
+  margin-bottom: 4px;
+}
+
+.profile-stat-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Profil Bölümleri */
+.profile-section {
+  margin-bottom: 20px;
+}
+
+.profile-section h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 12px;
+}
+
+.profile-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.profile-info-row:last-child {
+  border-bottom: none;
+}
+
+.profile-info-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.profile-info-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* Profil Footer */
+.profile-modal-footer {
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+.profile-logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #e74c3c;
+  background: transparent;
+  color: #e74c3c;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.profile-logout-btn:hover {
+  background: #e74c3c;
+  color: white;
+}
+
+/* User info tıklanabilir hover */
+#user-info-btn:hover {
+  opacity: 0.8;
+}
+
+/* Mobil Profil */
+@media (max-width: 768px) {
+  .profile-modal {
+    width: 95%;
+    max-height: 90vh;
+  }
+
+  .profile-card {
+    padding: 16px;
+  }
+
+  .profile-card-avatar {
+    width: 52px;
+    height: 52px;
+  }
+}

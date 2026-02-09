@@ -663,6 +663,153 @@ function initReminderSettings() {
   }
 }
 
+// ========================================
+// PROFILE PAGE (Kullanıcı Profil Sayfası)
+// ========================================
+function openProfileModal() {
+  if (!currentUser) return;
+  
+  const overlay = document.getElementById('profile-modal-overlay');
+  if (!overlay) return;
+  
+  // Profil bilgilerini doldur
+  const profileAvatar = document.getElementById('profile-avatar');
+  const profileName = document.getElementById('profile-name');
+  const profileEmail = document.getElementById('profile-email');
+  
+  if (profileAvatar) {
+    const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0iI0M0NUM3QyI+PGNpcmNsZSBjeD0iMjAiIGN5PSIxNSIgcj0iOCIgZmlsbD0iI0U4QTBCNSIvPjxwYXRoIGQ9Ik0zNSAzOGMwLTguMjg0LTYuNzE2LTE1LTE1LTE1cy0xNSA2LjcxNi0xNSAxNSIgZmlsbD0iI0U4QTBCNSIvPjwvc3ZnPg==';
+    const isValid = currentUser.picture && typeof currentUser.picture === 'string' && 
+      ['googleusercontent.com', 'google.com', 'gstatic.com', 'gravatar.com'].some(d => {
+        try { return new URL(currentUser.picture).hostname.endsWith(d); } catch { return false; }
+      });
+    profileAvatar.src = isValid ? currentUser.picture : defaultAvatar;
+  }
+  if (profileName) profileName.textContent = currentUser.name || 'Kullanıcı';
+  if (profileEmail) profileEmail.textContent = currentUser.email || '';
+  
+  // Bildirim durumu
+  const profileNotifications = document.getElementById('profile-notifications');
+  if (profileNotifications) {
+    profileNotifications.textContent = pushEnabled ? '🔔 Açık' : '🔕 Kapalı';
+  }
+  
+  // İstatistikleri yükle
+  loadProfileStats();
+  
+  overlay.style.display = 'flex';
+}
+
+function closeProfileModal() {
+  const overlay = document.getElementById('profile-modal-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+async function loadProfileStats() {
+  if (!currentUser) return;
+  
+  try {
+    const userId = getUserId();
+    
+    // Sohbet istatistiklerini API'den al
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'list', userId })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const chats = data.chats || [];
+      
+      // Toplam sohbet sayısı
+      const statChats = document.getElementById('profile-stat-chats');
+      if (statChats) statChats.textContent = chats.length;
+      
+      // Toplam mesaj sayısı
+      const totalMessages = chats.reduce((sum, c) => sum + (c.messageCount || 0), 0);
+      const statMessages = document.getElementById('profile-stat-messages');
+      if (statMessages) statMessages.textContent = totalMessages;
+      
+      // En çok kullanılan mod
+      const modeCounts = {};
+      chats.forEach(c => {
+        const m = c.mode || 'care';
+        modeCounts[m] = (modeCounts[m] || 0) + 1;
+      });
+      const modeNames = { care: '🧴 Bakım', motivation: '💪 Motivasyon', diet: '🥗 Beslenme' };
+      const topMode = Object.keys(modeCounts).sort((a, b) => modeCounts[b] - modeCounts[a])[0];
+      const favMode = document.getElementById('profile-fav-mode');
+      if (favMode) favMode.textContent = topMode ? (modeNames[topMode] || topMode) : '-';
+    }
+    
+    // Kullanıcı profil bilgilerini API'den al
+    const userResponse = await fetch(`/api/auth/user/${currentUser.id}`);
+    if (userResponse.ok) {
+      const userData = await userResponse.json();
+      
+      // Üyelik tarihi
+      const joinedEl = document.getElementById('profile-joined');
+      if (joinedEl && userData.createdAt) {
+        joinedEl.textContent = new Date(userData.createdAt).toLocaleDateString('tr-TR', {
+          day: 'numeric', month: 'long', year: 'numeric'
+        });
+      }
+      
+      // Son giriş (şimdiki zaman çünkü kullanıcı şu an aktif)
+      const lastLoginEl = document.getElementById('profile-last-login');
+      if (lastLoginEl) {
+        lastLoginEl.textContent = new Date().toLocaleDateString('tr-TR', {
+          day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+      }
+      
+      // Üyelik süresi (gün)
+      const statDays = document.getElementById('profile-stat-days');
+      if (statDays && userData.createdAt) {
+        const days = Math.floor((Date.now() - new Date(userData.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+        statDays.textContent = Math.max(1, days);
+      }
+    }
+    
+  } catch (err) {
+    console.error('Profil istatistik hatası:', err);
+  }
+}
+
+function initProfilePage() {
+  // User info tıklama -> profil aç
+  const userInfoBtn = document.getElementById('user-info-btn');
+  if (userInfoBtn) {
+    userInfoBtn.addEventListener('click', openProfileModal);
+  }
+  
+  // Kapatma butonu
+  const closeBtn = document.getElementById('profile-modal-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeProfileModal);
+  }
+  
+  // Overlay tıklama (dışına tıklayınca kapat)
+  const overlay = document.getElementById('profile-modal-overlay');
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeProfileModal();
+    });
+  }
+  
+  // Profil sayfasındaki çıkış butonu
+  const profileLogoutBtn = document.getElementById('profile-logout-btn');
+  if (profileLogoutBtn) {
+    profileLogoutBtn.addEventListener('click', () => {
+      closeProfileModal();
+      // Mevcut logout fonksiyonunu çağır
+      const logoutBtn = document.getElementById('logout-btn');
+      if (logoutBtn) logoutBtn.click();
+    });
+  }
+}
+
 function showInAppNotification(title, body) {
   // Uygulama içi bildirim toast
   const toast = document.createElement('div');
@@ -1220,6 +1367,7 @@ async function init() {
   initMobileMenu();
   initEventListeners();
   initReminderSettings(); // Hatırlatıcı ayarları
+  initProfilePage(); // Profil sayfası
   initGoogleAuth(); // Google OAuth başlat (bu updateLoginState'i de çağırır)
   
   // Sadece giriş yapılmışsa sohbetleri yükle
