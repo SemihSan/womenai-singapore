@@ -415,6 +415,16 @@
               <span class="profile-info-value" id="profile-notifications">Kapalı</span>
             </div>
           </div>
+
+          <!-- Profil Anketi Butonu -->
+          <div class="profile-section">
+            <button class="profile-survey-btn" id="open-survey-btn">
+              <span id="survey-btn-icon">📝</span>
+              <span id="survey-btn-text">Profil Anketini Doldur</span>
+              <span class="survey-btn-arrow">→</span>
+            </button>
+            <p class="survey-hint" id="survey-hint">Kişiselleştirilmiş öneriler almak için profilini tamamla!</p>
+          </div>
         </div>
 
         <div class="profile-modal-footer">
@@ -426,6 +436,132 @@
             </svg>
             Çıkış Yap
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profil Anketi Modal -->
+    <div class="survey-modal-overlay" id="survey-modal-overlay" style="display: none;">
+      <div class="survey-modal">
+        <div class="survey-modal-header">
+          <h2>📋 Profil Anketi</h2>
+          <button class="profile-modal-close" id="survey-modal-close">&times;</button>
+        </div>
+
+        <div class="survey-modal-body">
+          <!-- Adım göstericisi -->
+          <div class="survey-progress">
+            <div class="survey-progress-bar" id="survey-progress-bar" style="width: 25%"></div>
+          </div>
+          <div class="survey-step-label" id="survey-step-label">Adım 1/4</div>
+
+          <!-- Adım 1: Cilt Tipi -->
+          <div class="survey-step" id="survey-step-1">
+            <h3>🧴 Cilt Tipiniz Nedir?</h3>
+            <div class="survey-options">
+              <label class="survey-option"><input type="radio" name="skinType" value="kuru"><span>💧 Kuru</span><small>Gerginlik, soyulma, mat görünüm</small></label>
+              <label class="survey-option"><input type="radio" name="skinType" value="yagli"><span>✨ Yağlı</span><small>Parlama, geniş gözenekler</small></label>
+              <label class="survey-option"><input type="radio" name="skinType" value="karma"><span>🔄 Karma</span><small>T-bölgesi yağlı, yanaklar kuru</small></label>
+              <label class="survey-option"><input type="radio" name="skinType" value="normal"><span>😊 Normal</span><small>Dengeli, az sorunlu</small></label>
+              <label class="survey-option"><input type="radio" name="skinType" value="hassas"><span>🌸 Hassas</span><small>Kolay kızarır, tahriş olur</small></label>
+            </div>
+
+            <h3 style="margin-top: 20px;">Cilt Sorunlarınız (birden fazla seçebilirsiniz)</h3>
+            <div class="survey-chips" id="skin-concerns-chips">
+              <label class="survey-chip"><input type="checkbox" name="skinConcern" value="akne"><span>🔴 Akne</span></label>
+              <label class="survey-chip"><input type="checkbox" name="skinConcern" value="leke"><span>🟤 Leke</span></label>
+              <label class="survey-chip"><input type="checkbox" name="skinConcern" value="kirisiklik"><span>〰️ Kırışıklık</span></label>
+              <label class="survey-chip"><input type="checkbox" name="skinConcern" value="gozenek"><span>⚫ Gözenekler</span></label>
+              <label class="survey-chip"><input type="checkbox" name="skinConcern" value="kuruluk"><span>🏜️ Kuruluk</span></label>
+              <label class="survey-chip"><input type="checkbox" name="skinConcern" value="kizariklik"><span>🌡️ Kızarıklık</span></label>
+              <label class="survey-chip"><input type="checkbox" name="skinConcern" value="matlik"><span>😶 Matlık</span></label>
+              <label class="survey-chip"><input type="checkbox" name="skinConcern" value="sarkma"><span>⬇️ Sarkma</span></label>
+            </div>
+          </div>
+
+          <!-- Adım 2: Yaş / Cinsiyet / Bölge -->
+          <div class="survey-step" id="survey-step-2" style="display: none;">
+            <h3>👤 Kişisel Bilgiler</h3>
+            
+            <div class="survey-field">
+              <label>Yaş Aralığı</label>
+              <div class="survey-options compact">
+                <label class="survey-option"><input type="radio" name="age" value="18-24"><span>18-24</span></label>
+                <label class="survey-option"><input type="radio" name="age" value="25-34"><span>25-34</span></label>
+                <label class="survey-option"><input type="radio" name="age" value="35-44"><span>35-44</span></label>
+                <label class="survey-option"><input type="radio" name="age" value="45-54"><span>45-54</span></label>
+                <label class="survey-option"><input type="radio" name="age" value="55+"><span>55+</span></label>
+              </div>
+            </div>
+
+            <div class="survey-field">
+              <label>Cinsiyet</label>
+              <div class="survey-options compact">
+                <label class="survey-option"><input type="radio" name="gender" value="kadin"><span>👩 Kadın</span></label>
+                <label class="survey-option"><input type="radio" name="gender" value="erkek"><span>👨 Erkek</span></label>
+                <label class="survey-option"><input type="radio" name="gender" value="belirtmek-istemiyorum"><span>🤐 Belirtmek İstemiyorum</span></label>
+              </div>
+            </div>
+
+            <div class="survey-field">
+              <label>Bölge / Şehir</label>
+              <select class="survey-select" id="survey-region">
+                <option value="">Seçiniz...</option>
+                <option value="İstanbul">İstanbul</option>
+                <option value="Ankara">Ankara</option>
+                <option value="İzmir">İzmir</option>
+                <option value="Antalya">Antalya</option>
+                <option value="Bursa">Bursa</option>
+                <option value="Adana">Adana</option>
+                <option value="Konya">Konya</option>
+                <option value="Gaziantep">Gaziantep</option>
+                <option value="Trabzon">Trabzon</option>
+                <option value="Diyarbakır">Diyarbakır</option>
+                <option value="Erzurum">Erzurum</option>
+                <option value="Singapur">Singapur</option>
+                <option value="Diğer">Diğer</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Adım 3: Alerjiler -->
+          <div class="survey-step" id="survey-step-3" style="display: none;">
+            <h3>⚠️ Alerji ve Hassasiyetler</h3>
+            <p class="survey-desc">Alerji veya hassasiyetin varsa seç, AI önerilerinde bunlardan kaçınacak.</p>
+
+            <h4>Alerji / Tahriş Eden İçerikler</h4>
+            <div class="survey-chips" id="allergy-chips">
+              <label class="survey-chip"><input type="checkbox" name="allergy" value="parfüm"><span>🌺 Parfüm/Koku</span></label>
+              <label class="survey-chip"><input type="checkbox" name="allergy" value="retinol"><span>💊 Retinol</span></label>
+              <label class="survey-chip"><input type="checkbox" name="allergy" value="aha-bha"><span>🧪 AHA/BHA</span></label>
+              <label class="survey-chip"><input type="checkbox" name="allergy" value="vitamin-c"><span>🍊 Vitamin C</span></label>
+              <label class="survey-chip"><input type="checkbox" name="allergy" value="niacinamide"><span>💜 Niacinamide</span></label>
+              <label class="survey-chip"><input type="checkbox" name="allergy" value="alkol"><span>🧴 Alkol</span></label>
+              <label class="survey-chip"><input type="checkbox" name="allergy" value="paraben"><span>🔬 Paraben</span></label>
+            </div>
+
+            <h4 style="margin-top: 16px;">Hassasiyet Tetikleyicileri</h4>
+            <div class="survey-chips" id="sensitivity-chips">
+              <label class="survey-chip"><input type="checkbox" name="sensitivity" value="güneş"><span>☀️ Güneş</span></label>
+              <label class="survey-chip"><input type="checkbox" name="sensitivity" value="soğuk"><span>❄️ Soğuk Hava</span></label>
+              <label class="survey-chip"><input type="checkbox" name="sensitivity" value="sıcak"><span>🔥 Sıcak Hava</span></label>
+              <label class="survey-chip"><input type="checkbox" name="sensitivity" value="stres"><span>😰 Stres</span></label>
+              <label class="survey-chip"><input type="checkbox" name="sensitivity" value="hormon"><span>🔄 Hormonal Değişim</span></label>
+              <label class="survey-chip"><input type="checkbox" name="sensitivity" value="kirlilik"><span>🏭 Hava Kirliliği</span></label>
+            </div>
+          </div>
+
+          <!-- Adım 4: Özet -->
+          <div class="survey-step" id="survey-step-4" style="display: none;">
+            <h3>✨ Profil Özeti</h3>
+            <div class="survey-summary" id="survey-summary"></div>
+            <p class="survey-desc">Bu bilgilere göre sana özel cilt bakımı, beslenme ve motivasyon önerileri alacaksın!</p>
+          </div>
+        </div>
+
+        <div class="survey-modal-footer">
+          <button class="survey-btn secondary" id="survey-prev-btn" style="display: none;">← Geri</button>
+          <button class="survey-btn primary" id="survey-next-btn">Devam →</button>
         </div>
       </div>
     </div>
@@ -446,6 +582,6 @@
     </div>
   </div>
 
-  <script src="main.js?v=2.8"></script>
+  <script src="main.js?v=2.9"></script>
 </body>
 </html>

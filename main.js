@@ -770,6 +770,11 @@ async function loadProfileStats() {
         const days = Math.floor((Date.now() - new Date(userData.createdAt).getTime()) / (1000 * 60 * 60 * 24));
         statDays.textContent = Math.max(1, days);
       }
+      
+      // Profil anketi tamamlanmış mı?
+      if (userData.profile && userData.profile.isProfileComplete) {
+        updateSurveyButton(true);
+      }
     }
     
   } catch (err) {
@@ -806,6 +811,261 @@ function initProfilePage() {
       // Mevcut logout fonksiyonunu çağır
       const logoutBtn = document.getElementById('logout-btn');
       if (logoutBtn) logoutBtn.click();
+    });
+  }
+  
+  // Anket butonu
+  const openSurveyBtn = document.getElementById('open-survey-btn');
+  if (openSurveyBtn) {
+    openSurveyBtn.addEventListener('click', () => {
+      closeProfileModal();
+      openSurveyModal();
+    });
+  }
+  
+  // Anket modal init
+  initSurveyModal();
+}
+
+// ========================================
+// SURVEY MODAL (Profil Anketi)
+// ========================================
+let surveyStep = 1;
+const TOTAL_STEPS = 4;
+
+function openSurveyModal() {
+  const overlay = document.getElementById('survey-modal-overlay');
+  if (!overlay) return;
+  
+  surveyStep = 1;
+  showSurveyStep(1);
+  loadExistingSurveyData();
+  overlay.style.display = 'flex';
+}
+
+function closeSurveyModal() {
+  const overlay = document.getElementById('survey-modal-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function showSurveyStep(step) {
+  surveyStep = step;
+  
+  // Tüm adımları gizle
+  for (let i = 1; i <= TOTAL_STEPS; i++) {
+    const el = document.getElementById(`survey-step-${i}`);
+    if (el) el.style.display = i === step ? 'block' : 'none';
+  }
+  
+  // Progress bar güncelle
+  const bar = document.getElementById('survey-progress-bar');
+  if (bar) bar.style.width = `${(step / TOTAL_STEPS) * 100}%`;
+  
+  // Step label güncelle
+  const label = document.getElementById('survey-step-label');
+  if (label) label.textContent = `Adım ${step}/${TOTAL_STEPS}`;
+  
+  // Butonları güncelle
+  const prevBtn = document.getElementById('survey-prev-btn');
+  const nextBtn = document.getElementById('survey-next-btn');
+  if (prevBtn) prevBtn.style.display = step > 1 ? 'block' : 'none';
+  if (nextBtn) {
+    if (step === TOTAL_STEPS) {
+      nextBtn.textContent = '💾 Kaydet';
+    } else {
+      nextBtn.textContent = 'Devam →';
+    }
+  }
+  
+  // Son adımda özet göster
+  if (step === TOTAL_STEPS) {
+    buildSurveySummary();
+  }
+}
+
+function getSurveyData() {
+  // Cilt tipi
+  const skinTypeEl = document.querySelector('input[name="skinType"]:checked');
+  const skinType = skinTypeEl ? skinTypeEl.value : '';
+  
+  // Cilt sorunları
+  const skinConcerns = Array.from(document.querySelectorAll('input[name="skinConcern"]:checked')).map(el => el.value);
+  
+  // Yaş
+  const ageEl = document.querySelector('input[name="age"]:checked');
+  const age = ageEl ? ageEl.value : '';
+  
+  // Cinsiyet
+  const genderEl = document.querySelector('input[name="gender"]:checked');
+  const gender = genderEl ? genderEl.value : '';
+  
+  // Bölge
+  const region = document.getElementById('survey-region')?.value || '';
+  
+  // Alerjiler
+  const allergies = Array.from(document.querySelectorAll('input[name="allergy"]:checked')).map(el => el.value);
+  
+  // Hassasiyetler
+  const sensitivities = Array.from(document.querySelectorAll('input[name="sensitivity"]:checked')).map(el => el.value);
+  
+  return { skinType, skinConcerns, age, gender, region, allergies, sensitivities };
+}
+
+function buildSurveySummary() {
+  const data = getSurveyData();
+  const summary = document.getElementById('survey-summary');
+  if (!summary) return;
+  
+  const skinTypeNames = { kuru: '💧 Kuru', yagli: '✨ Yağlı', karma: '🔄 Karma', normal: '😊 Normal', hassas: '🌸 Hassas' };
+  const genderNames = { kadin: '👩 Kadın', erkek: '👨 Erkek', 'belirtmek-istemiyorum': '🤐 Belirtmek İstemiyorum' };
+  
+  let html = '';
+  html += `<div class="survey-summary-item"><span class="survey-summary-label">Cilt Tipi</span><span class="survey-summary-value">${skinTypeNames[data.skinType] || '—'}</span></div>`;
+  html += `<div class="survey-summary-item"><span class="survey-summary-label">Cilt Sorunları</span><span class="survey-summary-value">${data.skinConcerns.length > 0 ? data.skinConcerns.join(', ') : '—'}</span></div>`;
+  html += `<div class="survey-summary-item"><span class="survey-summary-label">Yaş Aralığı</span><span class="survey-summary-value">${data.age || '—'}</span></div>`;
+  html += `<div class="survey-summary-item"><span class="survey-summary-label">Cinsiyet</span><span class="survey-summary-value">${genderNames[data.gender] || '—'}</span></div>`;
+  html += `<div class="survey-summary-item"><span class="survey-summary-label">Bölge</span><span class="survey-summary-value">${data.region || '—'}</span></div>`;
+  html += `<div class="survey-summary-item"><span class="survey-summary-label">Alerjiler</span><span class="survey-summary-value">${data.allergies.length > 0 ? data.allergies.join(', ') : '—'}</span></div>`;
+  html += `<div class="survey-summary-item"><span class="survey-summary-label">Hassasiyetler</span><span class="survey-summary-value">${data.sensitivities.length > 0 ? data.sensitivities.join(', ') : '—'}</span></div>`;
+  
+  summary.innerHTML = html;
+}
+
+async function saveSurveyData() {
+  if (!currentUser) return;
+  
+  const nextBtn = document.getElementById('survey-next-btn');
+  if (nextBtn) {
+    nextBtn.disabled = true;
+    nextBtn.textContent = '⏳ Kaydediliyor...';
+  }
+  
+  try {
+    const data = getSurveyData();
+    
+    const response = await fetch('/api/user/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: currentUser.id,
+        profile: data
+      })
+    });
+    
+    if (response.ok) {
+      closeSurveyModal();
+      showInAppNotification('✅ Profil Kaydedildi', 'Artık sana özel öneriler alacaksın!');
+      
+      // Profil butonu güncelle
+      updateSurveyButton(true);
+    } else {
+      throw new Error('Kayıt başarısız');
+    }
+  } catch (err) {
+    console.error('Anket kayıt hatası:', err);
+    showInAppNotification('❌ Hata', 'Profil kaydedilemedi');
+  } finally {
+    if (nextBtn) {
+      nextBtn.disabled = false;
+      nextBtn.textContent = '💾 Kaydet';
+    }
+  }
+}
+
+async function loadExistingSurveyData() {
+  if (!currentUser) return;
+  
+  try {
+    const response = await fetch(`/api/user/profile/${currentUser.id}`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data.profile && data.isComplete) {
+        const p = data.profile;
+        
+        // Radio'ları seç
+        if (p.skinType) {
+          const el = document.querySelector(`input[name="skinType"][value="${p.skinType}"]`);
+          if (el) el.checked = true;
+        }
+        if (p.age) {
+          const el = document.querySelector(`input[name="age"][value="${p.age}"]`);
+          if (el) el.checked = true;
+        }
+        if (p.gender) {
+          const el = document.querySelector(`input[name="gender"][value="${p.gender}"]`);
+          if (el) el.checked = true;
+        }
+        
+        // Checkboxları seç
+        (p.skinConcerns || []).forEach(v => {
+          const el = document.querySelector(`input[name="skinConcern"][value="${v}"]`);
+          if (el) el.checked = true;
+        });
+        (p.allergies || []).forEach(v => {
+          const el = document.querySelector(`input[name="allergy"][value="${v}"]`);
+          if (el) el.checked = true;
+        });
+        (p.sensitivities || []).forEach(v => {
+          const el = document.querySelector(`input[name="sensitivity"][value="${v}"]`);
+          if (el) el.checked = true;
+        });
+        
+        // Bölge
+        if (p.region) {
+          const region = document.getElementById('survey-region');
+          if (region) region.value = p.region;
+        }
+      }
+    }
+  } catch (err) {
+    console.log('Mevcut profil verisi yüklenemedi:', err.message);
+  }
+}
+
+function updateSurveyButton(isComplete) {
+  const btn = document.getElementById('open-survey-btn');
+  const icon = document.getElementById('survey-btn-icon');
+  const text = document.getElementById('survey-btn-text');
+  const hint = document.getElementById('survey-hint');
+  
+  if (isComplete) {
+    if (btn) btn.classList.add('completed');
+    if (icon) icon.textContent = '✅';
+    if (text) text.textContent = 'Profilini Düzenle';
+    if (hint) hint.textContent = 'Profilin tamamlandı! AI sana özel öneriler verecek.';
+  }
+}
+
+function initSurveyModal() {
+  // Kapatma
+  const closeBtn = document.getElementById('survey-modal-close');
+  if (closeBtn) closeBtn.addEventListener('click', closeSurveyModal);
+  
+  // Overlay tıklama
+  const overlay = document.getElementById('survey-modal-overlay');
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeSurveyModal();
+    });
+  }
+  
+  // Geri butonu
+  const prevBtn = document.getElementById('survey-prev-btn');
+  if (prevBtn) {
+    prevBtn.addEventListener('click', () => {
+      if (surveyStep > 1) showSurveyStep(surveyStep - 1);
+    });
+  }
+  
+  // İleri butonu
+  const nextBtn = document.getElementById('survey-next-btn');
+  if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+      if (surveyStep < TOTAL_STEPS) {
+        showSurveyStep(surveyStep + 1);
+      } else {
+        saveSurveyData();
+      }
     });
   }
 }

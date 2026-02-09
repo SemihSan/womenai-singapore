@@ -295,6 +295,18 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   picture: { type: String },
   visitorId: { type: String }, // Eski visitor ID - geçiş için
+  // Profil bilgileri (anket)
+  profile: {
+    skinType: { type: String, enum: ['kuru', 'yagli', 'karma', 'normal', 'hassas', ''], default: '' },
+    skinConcerns: [{ type: String }], // ['akne', 'leke', 'kirisiklik', 'gozemek', 'kurulik', 'kizariklik']
+    age: { type: String, enum: ['18-24', '25-34', '35-44', '45-54', '55+', ''], default: '' },
+    gender: { type: String, enum: ['kadin', 'erkek', 'belirtmek-istemiyorum', ''], default: '' },
+    region: { type: String, default: '' }, // Şehir
+    allergies: [{ type: String }], // ['parfum', 'retinol', 'aha-bha', 'vitamin-c', 'niacinamide']
+    sensitivities: [{ type: String }], // ['gunes', 'soguk', 'sicak', 'stres', 'hormon']
+    isProfileComplete: { type: Boolean, default: false },
+    completedAt: { type: Date },
+  },
   createdAt: { type: Date, default: Date.now },
   lastLogin: { type: Date, default: Date.now },
 });
@@ -888,11 +900,33 @@ async function handleUnifiedChatAPI(req, res) {
         else if (currentMode === 'motivation') modePrompt = settings.motivationPrompt || '';
         else if (currentMode === 'diet') modePrompt = settings.dietPrompt || '';
 
+        // Kullanıcı profil bilgilerini al (kişiselleştirme)
+        let profilePrompt = '';
+        try {
+          const userIdRaw = userId.replace('google_', '');
+          const userDoc = await User.findById(userIdRaw);
+          if (userDoc && userDoc.profile && userDoc.profile.isProfileComplete) {
+            const p = userDoc.profile;
+            const parts = [];
+            if (p.skinType) parts.push(`Cilt tipi: ${p.skinType}`);
+            if (p.skinConcerns && p.skinConcerns.length > 0) parts.push(`Cilt sorunları: ${p.skinConcerns.join(', ')}`);
+            if (p.age) parts.push(`Yaş aralığı: ${p.age}`);
+            if (p.region) parts.push(`Bölge: ${p.region}`);
+            if (p.allergies && p.allergies.length > 0) parts.push(`Alerjiler: ${p.allergies.join(', ')} - BU İÇERİKLERE DİKKAT ET, ÖNERİLERDE BUNLARDAN KAÇIN!`);
+            if (p.sensitivities && p.sensitivities.length > 0) parts.push(`Hassasiyetler: ${p.sensitivities.join(', ')}`);
+            if (parts.length > 0) {
+              profilePrompt = `\n\n👤 KULLANICI PROFİLİ (önerileri buna göre kişiselleştir):\n${parts.join('\n')}`;
+            }
+          }
+        } catch (profileErr) {
+          console.log('Profil bilgisi alınamadı:', profileErr.message);
+        }
+
         // Son 10 mesajı al
         const recentMessages = chat.messages.slice(-10).map((m) => ({ role: m.role, content: m.content }));
 
         const apiMessages = [
-          { role: 'system', content: settings.systemPrompt || 'Sen bir kadın yaşam asistanısın.' },
+          { role: 'system', content: (settings.systemPrompt || 'Sen bir kadın yaşam asistanısın.') + profilePrompt },
           modePrompt ? { role: 'system', content: modePrompt } : null,
           ...recentMessages,
         ].filter(Boolean);
@@ -1272,11 +1306,73 @@ app.get('/api/auth/user/:userId', async (req, res) => {
       picture: user.picture,
       createdAt: user.createdAt,
       lastLogin: user.lastLogin,
+      profile: user.profile || {},
     });
 
   } catch (err) {
     console.error('Get user error:', err);
     return res.status(500).json({ error: 'Kullanıcı bilgileri alınamadı' });
+  }
+});
+
+/* =========================================================
+  8.2) KULLANICI PROFİL ANKETİ API
+  ========================================================= */
+
+// Profil bilgilerini kaydet/güncelle
+app.put('/api/user/profile', async (req, res) => {
+  try {
+    const { userId, profile } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'userId gerekli' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+    }
+
+    // Profil alanlarını güncelle
+    user.profile = {
+      skinType: profile.skinType || '',
+      skinConcerns: profile.skinConcerns || [],
+      age: profile.age || '',
+      gender: profile.gender || '',
+      region: profile.region || '',
+      allergies: profile.allergies || [],
+      sensitivities: profile.sensitivities || [],
+      isProfileComplete: true,
+      completedAt: new Date(),
+    };
+
+    await user.save();
+    console.log(`✅ Profil güncellendi: ${user.email}`);
+
+    return res.json({ success: true, profile: user.profile });
+  } catch (err) {
+    console.error('Profile update error:', err);
+    return res.status(500).json({ error: 'Profil güncellenemedi' });
+  }
+});
+
+// Profil bilgilerini getir
+app.get('/api/user/profile/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+    }
+
+    return res.json({
+      profile: user.profile || {},
+      isComplete: user.profile?.isProfileComplete || false,
+    });
+  } catch (err) {
+    console.error('Get profile error:', err);
+    return res.status(500).json({ error: 'Profil bilgileri alınamadı' });
   }
 });
 
