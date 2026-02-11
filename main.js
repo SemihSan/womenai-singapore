@@ -9,6 +9,19 @@ const API_URL = '/api/chat';
 const WEATHER_URL = '/api/weather';
 const GOOGLE_CLIENT_ID = ''; // .env'den alınacak, başlangıçta boş
 
+// ========================================
+// GOOGLE ANALYTICS 4 - EVENT TRACKING
+// ========================================
+function trackEvent(eventName, params = {}) {
+  try {
+    if (typeof gtag === 'function') {
+      gtag('event', eventName, params);
+    }
+  } catch (e) {
+    // GA4 yüklenemezse sessizce devam et
+  }
+}
+
 // State
 let currentChatId = null;
 let messages = [];
@@ -113,6 +126,7 @@ async function handleGoogleSignIn(response) {
       updateLoginState(); // Chat alanını göster
       await loadChatHistory(); // Sohbetleri yeniden yükle
       await startNewChat(); // Yeni sohbet başlat
+      trackEvent('login', { method: 'google' });
       console.log('✅ Google ile giriş başarılı:', data.user.name);
     } else {
       console.error('Google giriş hatası:', data.error);
@@ -468,6 +482,7 @@ async function requestNotificationPermission() {
     
     if (permission === 'granted') {
       console.log('✅ Bildirim izni verildi');
+      trackEvent('push_permission', { status: 'granted' });
       
       // Config'i tekrar al ve token al
       const response = await fetch('/api/config');
@@ -955,6 +970,7 @@ async function saveSurveyData() {
     if (response.ok) {
       closeSurveyModal();
       showInAppNotification('✅ Profil Kaydedildi', 'Artık sana özel öneriler alacaksın!');
+      trackEvent('survey_complete', { skin_type: data.skinType, age: data.age, region: data.region });
       
       // Profil butonu güncelle
       updateSurveyButton(true);
@@ -1266,6 +1282,7 @@ async function startNewChat() {
     renderMessages();
     loadChatHistory();
     showChatView();
+    trackEvent('chat_start');
   } catch (error) {
     console.error('New chat error:', error);
   }
@@ -1277,6 +1294,8 @@ async function sendMessage(content = null) {
   
   // Disabled durumunda işlem yapma
   if (elements.sendBtn.disabled) return;
+  
+  trackEvent('message_sent', { mode: currentMode });
   
   // chatId yoksa önce yeni sohbet oluştur
   if (!currentChatId) {
@@ -1421,6 +1440,7 @@ function showChatView() {
 // WEATHER MODAL
 // ========================================
 function openWeatherModal() {
+  trackEvent('weather_check');
   elements.weatherModalOverlay.classList.add('active');
   loadWeather();
 }
@@ -1538,6 +1558,7 @@ function selectMode(btn) {
   elements.modeBtns.forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   currentMode = btn.dataset.mode || 'care';
+  trackEvent('mode_change', { mode: currentMode });
 }
 
 // ========================================
