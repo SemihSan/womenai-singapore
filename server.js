@@ -2387,6 +2387,167 @@ app.get('/admin/activity-stats', adminAuthMiddleware, async (req, res) => {
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 /* =========================================================
+  SOHBET İSTATİSTİKLERİ DASHBOARD API
+  ========================================================= */
+app.get('/admin/chat-stats', adminAuthMiddleware, async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const since = new Date();
+    since.setDate(since.getDate() - parseInt(days));
+
+    // 1) Günlük mesaj sayısı
+    const dailyMessages = await Chat.aggregate([
+      { $unwind: '$messages' },
+      { $match: { 'messages.timestamp': { $gte: since } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$messages.timestamp' } },
+          count: { $sum: 1 },
+          userMsgs: { $sum: { $cond: [{ $eq: ['$messages.role', 'user'] }, 1, 0] } },
+          aiMsgs: { $sum: { $cond: [{ $eq: ['$messages.role', 'assistant'] }, 1, 0] } },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // 2) Mod dağılımı
+    const modeDistribution = await Chat.aggregate([
+      { $match: { updatedAt: { $gte: since } } },
+      { $group: { _id: '$mode', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]);
+
+    // 3) Saatlik mesaj yoğunluğu
+    const hourlyMessages = await Chat.aggregate([
+      { $unwind: '$messages' },
+      { $match: { 'messages.timestamp': { $gte: since } } },
+      { $group: { _id: { $hour: '$messages.timestamp' }, count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // 4) Ortalama mesaj/sohbet
+    const avgMessagesPerChat = await Chat.aggregate([
+      { $match: { updatedAt: { $gte: since } } },
+      { $project: { msgCount: { $size: '$messages' } } },
+      { $group: { _id: null, avg: { $avg: '$msgCount' }, max: { $max: '$msgCount' }, min: { $min: '$msgCount' } } },
+    ]);
+
+    // 5) Aktif kullanıcılar (son N günde mesaj atan)
+    const activeUsers = await Chat.aggregate([
+      { $match: { updatedAt: { $gte: since } } },
+      { $group: { _id: '$userId' } },
+      { $count: 'total' },
+    ]);
+
+    // 6) En aktif kullanıcılar (top 10)
+    const topUsers = await Chat.aggregate([
+      { $match: { updatedAt: { $gte: since } } },
+      { $project: { userId: 1, msgCount: { $size: '$messages' } } },
+      { $group: { _id: '$userId', totalMessages: { $sum: '$msgCount' }, chatCount: { $sum: 1 } } },
+      { $sort: { totalMessages: -1 } },
+      { $limit: 10 },
+    ]);
+
+    // Kullanıcı isimleri çek
+    const userIds = topUsers.map(u => u._id.replace('google_', ''));
+    const users = await User.find({ googleId: { $in: userIds } }, 'googleId name email');
+    const userMap = {};
+    users.forEach(u => { userMap[`google_${u.googleId}`] = u.name || u.email; });
+
+    const topUsersWithNames = topUsers.map(u => ({
+      userId: u._id,
+      name: userMap[u._id] || u._id,
+      totalMessages: u.totalMessages,
+      chatCount: u.chatCount,
+    }));
+
+    // 7) Mesaj uzunluk dağılımı
+    const messageLengths = await Chat.aggregate([
+      { $unwind: '$messages' },
+      { $match: { 'messages.timestamp': { $gte: since }, 'messages.role': 'user' } },
+      {
+        $bucket: {
+          groupBy: { $strLenCP: '$messages.content' },
+          boundaries: [0, 50, 100, 200, 500, 1000, 5000],
+          default: '5000+',
+          output: { count: { $sum: 1 } },
+        },
+      },
+    ]);
+
+    // 8) Haftalık karşılaştırma
+    const lastWeek = new Date();
+    lastWeek.setDate(lastWeek.getDate() - 7);
+    const prevWeek = new Date();
+    prevWeek.setDate(prevWeek.getDate() - 14);
+
+    const thisWeekMsgs = await Chat.aggregate([
+      { $unwind: '$messages' },
+      { $match: { 'messages.timestamp': { $gte: lastWeek } } },
+      { $count: 'total' },
+    ]);
+
+    const prevWeekMsgs = await Chat.aggregate([
+      { $unwind: '$messages' },
+      { $match: { 'messages.timestamp': { $gte: prevWeek, $lt: lastWeek } } },
+      { $count: 'total' },
+    ]);
+
+    const thisWeekTotal = thisWeekMsgs[0]?.total || 0;
+    const prevWeekTotal = prevWeekMsgs[0]?.total || 0;
+    const weeklyGrowth = prevWeekTotal > 0 ? Math.round(((thisWeekTotal - prevWeekTotal) / prevWeekTotal) * 100) : 100;
+
+    // 9) Kullanıcı profil tamamlama oranı
+    const totalUsers = await User.countDocuments();
+    const completedProfiles = await User.countDocuments({ 'profile.isProfileComplete': true });
+
+    // 10) Günlük aktif kullanıcı (DAU)
+    const dailyActiveUsers = await Chat.aggregate([
+      { $match: { updatedAt: { $gte: since } } },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: '%Y-%m-%d', date: '$updatedAt' } },
+            userId: '$userId',
+          },
+        },
+      },
+      { $group: { _id: '$_id.date', activeUsers: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+    ]);
+
+    return res.json({
+      period: `${days} gün`,
+      dailyMessages,
+      modeDistribution,
+      hourlyMessages,
+      avgMessagesPerChat: {
+        avg: Math.round((avgMessagesPerChat[0]?.avg || 0) * 10) / 10,
+        max: avgMessagesPerChat[0]?.max || 0,
+        min: avgMessagesPerChat[0]?.min || 0,
+      },
+      activeUsers: activeUsers[0]?.total || 0,
+      topUsers: topUsersWithNames,
+      messageLengths,
+      weeklyComparison: {
+        thisWeek: thisWeekTotal,
+        prevWeek: prevWeekTotal,
+        growth: weeklyGrowth,
+      },
+      profileCompletion: {
+        total: totalUsers,
+        completed: completedProfiles,
+        rate: totalUsers > 0 ? Math.round((completedProfiles / totalUsers) * 100) : 0,
+      },
+      dailyActiveUsers,
+    });
+  } catch (err) {
+    console.error('Chat stats error:', err);
+    return res.status(500).json({ error: 'Sunucu hatası' });
+  }
+});
+
+/* =========================================================
   HATIRLATICI SİSTEMİ (Scheduler)
   ========================================================= */
 
