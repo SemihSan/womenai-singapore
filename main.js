@@ -22,6 +22,215 @@ function trackEvent(eventName, params = {}) {
   }
 }
 
+// ========================================
+// KULLANICI DAVRANIŞI TAKİP SİSTEMİ
+// ========================================
+const BehaviorTracker = (() => {
+  let sessionId = null;
+  let sessionStart = null;
+  let eventQueue = [];
+  let flushTimer = null;
+  let currentPage = 'chat';
+  let pageEnterTime = Date.now();
+  let isActive = true;
+  let totalActiveTime = 0;
+  let lastActiveTime = Date.now();
+
+  // Session ID oluştur
+  function getSessionId() {
+    if (!sessionId) {
+      sessionId = 'ses_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+      sessionStart = Date.now();
+    }
+    return sessionId;
+  }
+
+  // Cihaz bilgisi
+  function getDeviceInfo() {
+    const ua = navigator.userAgent;
+    let deviceType = 'desktop';
+    if (/Mobi|Android/i.test(ua)) deviceType = 'mobile';
+    else if (/Tablet|iPad/i.test(ua)) deviceType = 'tablet';
+
+    let browser = 'other';
+    if (ua.includes('Chrome') && !ua.includes('Edg')) browser = 'chrome';
+    else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'safari';
+    else if (ua.includes('Firefox')) browser = 'firefox';
+    else if (ua.includes('Edg')) browser = 'edge';
+
+    return {
+      type: deviceType,
+      browser,
+      screenWidth: window.screen.width,
+      screenHeight: window.screen.height,
+    };
+  }
+
+  // Event'i kuyruğa ekle
+  function log(event, category = 'interaction', data = {}) {
+    eventQueue.push({
+      event,
+      category,
+      data,
+      page: currentPage,
+      timestamp: Date.now(),
+    });
+
+    // GA4'e de gönder
+    trackEvent(event, { category, page: currentPage, ...data });
+
+    // 10 event birikince veya 30 sn sonra flush
+    if (eventQueue.length >= 10) {
+      flush();
+    } else if (!flushTimer) {
+      flushTimer = setTimeout(flush, 30000);
+    }
+  }
+
+  // Kuyruğu sunucuya gönder
+  async function flush() {
+    if (flushTimer) {
+      clearTimeout(flushTimer);
+      flushTimer = null;
+    }
+
+    if (eventQueue.length === 0) return;
+
+    const batch = [...eventQueue];
+    eventQueue = [];
+
+    try {
+      await fetch('/api/activity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          events: batch,
+          sessionId: getSessionId(),
+          userId: getUserId(),
+          device: getDeviceInfo(),
+        }),
+      });
+    } catch (e) {
+      // Başarısızsa kuyruğa geri koy (max 100 event)
+      eventQueue = [...batch.slice(-50), ...eventQueue].slice(0, 100);
+    }
+  }
+
+  // Sayfa/ekran değişimini takip et
+  function trackPageView(page) {
+    const now = Date.now();
+    // Önceki sayfada geçen süre
+    if (currentPage) {
+      log('page_duration', 'engagement', {
+        page: currentPage,
+        duration: now - pageEnterTime,
+      });
+    }
+    currentPage = page;
+    pageEnterTime = now;
+    log('page_view', 'navigation', { page });
+  }
+
+  // Aktiflik takibi
+  function trackActivity() {
+    // Kullanıcı ayrıldığında
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        isActive = false;
+        totalActiveTime += Date.now() - lastActiveTime;
+        log('tab_hidden', 'engagement', { activeTime: totalActiveTime });
+      } else {
+        isActive = true;
+        lastActiveTime = Date.now();
+        log('tab_visible', 'engagement');
+      }
+    });
+
+    // Sayfa kapanırken session_end gönder
+    window.addEventListener('beforeunload', () => {
+      if (!isActive) {
+        totalActiveTime += 0;
+      } else {
+        totalActiveTime += Date.now() - lastActiveTime;
+      }
+
+      const sessionDuration = Date.now() - (sessionStart || Date.now());
+
+      // sendBeacon ile garanti gönderim
+      const payload = JSON.stringify({
+        events: [{
+          event: 'session_end',
+          category: 'engagement',
+          data: {
+            sessionDuration,
+            activeTime: totalActiveTime,
+            pageCount: 0,
+          },
+          page: currentPage,
+          duration: sessionDuration,
+          timestamp: Date.now(),
+        }],
+        sessionId: getSessionId(),
+        userId: getUserId(),
+        device: getDeviceInfo(),
+      });
+
+      navigator.sendBeacon('/api/activity', new Blob([payload], { type: 'application/json' }));
+    });
+  }
+
+  // Scroll derinliği takibi
+  function trackScrollDepth() {
+    let maxScroll = 0;
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+
+    chatMessages.addEventListener('scroll', () => {
+      const scrollPercent = Math.round(
+        (chatMessages.scrollTop / (chatMessages.scrollHeight - chatMessages.clientHeight || 1)) * 100
+      );
+      if (scrollPercent > maxScroll + 25) { // Her %25'te bir logla
+        maxScroll = scrollPercent;
+        log('scroll_depth', 'engagement', { depth: maxScroll });
+      }
+    });
+  }
+
+  // Feature kullanım takibi
+  function trackFeatureUsage(feature, data = {}) {
+    log('feature_use', 'feature', { feature, ...data });
+  }
+
+  // Hata takibi
+  function trackError(errorType, details = {}) {
+    log('client_error', 'error', { errorType, ...details });
+  }
+
+  // Başlat
+  function init() {
+    getSessionId();
+    log('session_start', 'engagement', {
+      referrer: document.referrer || 'direct',
+      url: window.location.href,
+    });
+    trackActivity();
+    trackScrollDepth();
+
+    // Periyodik flush (60 sn)
+    setInterval(flush, 60000);
+  }
+
+  return {
+    init,
+    log,
+    flush,
+    trackPageView,
+    trackFeatureUsage,
+    trackError,
+    getSessionId,
+  };
+})();
+
 // State
 let currentChatId = null;
 let messages = [];
@@ -127,6 +336,18 @@ async function handleGoogleSignIn(response) {
       await loadChatHistory(); // Sohbetleri yeniden yükle
       await startNewChat(); // Yeni sohbet başlat
       trackEvent('login', { method: 'google' });
+      BehaviorTracker.log('login', 'feature', { method: 'google', userName: data.user.name });
+      
+      // GA4 kullanıcı özelliklerini ayarla
+      if (typeof gtag === 'function') {
+        gtag('set', 'user_properties', {
+          user_type: 'google',
+          has_profile: data.user.profile?.isProfileComplete ? 'yes' : 'no',
+          skin_type: data.user.profile?.skinType || 'unknown',
+        });
+        gtag('config', 'G-EV7WSFQLQD', { user_id: data.user.id });
+      }
+      
       console.log('✅ Google ile giriş başarılı:', data.user.name);
     } else {
       console.error('Google giriş hatası:', data.error);
@@ -683,6 +904,7 @@ function initReminderSettings() {
 // ========================================
 function openProfileModal() {
   if (!currentUser) return;
+  BehaviorTracker.trackPageView('profile');
   
   const overlay = document.getElementById('profile-modal-overlay');
   if (!overlay) return;
@@ -851,6 +1073,7 @@ const TOTAL_STEPS = 4;
 function openSurveyModal() {
   const overlay = document.getElementById('survey-modal-overlay');
   if (!overlay) return;
+  BehaviorTracker.trackPageView('survey');
   
   surveyStep = 1;
   showSurveyStep(1);
@@ -1202,6 +1425,7 @@ function toggleTheme() {
   const newTheme = currentTheme === 'light' ? 'dark' : 'light';
   document.documentElement.setAttribute('data-theme', newTheme);
   localStorage.setItem('theme', newTheme);
+  BehaviorTracker.log('theme_change', 'interaction', { theme: newTheme });
 }
 
 // ========================================
@@ -1296,6 +1520,8 @@ async function sendMessage(content = null) {
   if (elements.sendBtn.disabled) return;
   
   trackEvent('message_sent', { mode: currentMode });
+  BehaviorTracker.log('message_sent', 'feature', { mode: currentMode, length: (content || elements.chatInput.value.trim()).length });
+  const msgSentTime = Date.now();
   
   // chatId yoksa önce yeni sohbet oluştur
   if (!currentChatId) {
@@ -1343,6 +1569,7 @@ async function sendMessage(content = null) {
     if (data.messages) {
       messages = data.messages;
       renderMessages();
+      BehaviorTracker.log('ai_response', 'feature', { mode: currentMode, responseTime: Date.now() - msgSentTime });
     }
     
     // Update chat ID if new
@@ -1353,6 +1580,7 @@ async function sendMessage(content = null) {
     loadChatHistory();
   } catch (error) {
     console.error('Send message error:', error);
+    BehaviorTracker.trackError('message_send_failed', { error: error.message });
     // Add error message
     messages.push({ 
       role: 'assistant', 
@@ -1429,6 +1657,7 @@ function showWelcomeView() {
 function showChatView() {
   elements.welcomeScreen.classList.add('hidden');
   elements.chatMessages.classList.add('active');
+  BehaviorTracker.trackPageView('chat');
   
   // Focus input
   if (elements.chatInput) {
@@ -1441,6 +1670,8 @@ function showChatView() {
 // ========================================
 function openWeatherModal() {
   trackEvent('weather_check');
+  BehaviorTracker.trackPageView('weather');
+  BehaviorTracker.trackFeatureUsage('weather_check');
   elements.weatherModalOverlay.classList.add('active');
   loadWeather();
 }
@@ -1643,6 +1874,9 @@ function initEventListeners() {
 // ========================================
 async function init() {
   console.log('🚀 Women AI başlatılıyor...');
+  
+  // Davranış takip sistemini başlat
+  BehaviorTracker.init();
   
   initTheme();
   initMobileMenu();

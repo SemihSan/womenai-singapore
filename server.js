@@ -343,6 +343,37 @@ const pushSubscriptionSchema = new mongoose.Schema({
 const PushSubscription = mongoose.model('PushSubscription', pushSubscriptionSchema);
 
 /* =========================================================
+  2.5) Activity Log Schema (Kullanıcı Davranış Takibi)
+  ========================================================= */
+const activityLogSchema = new mongoose.Schema({
+  userId: { type: String, required: true, index: true },
+  sessionId: { type: String, required: true, index: true },
+  event: { type: String, required: true, index: true },
+  category: {
+    type: String,
+    enum: ['navigation', 'interaction', 'feature', 'engagement', 'error'],
+    default: 'interaction',
+  },
+  data: { type: mongoose.Schema.Types.Mixed, default: {} },
+  page: { type: String, default: '' },
+  duration: { type: Number, default: 0 }, // ms
+  device: {
+    type: { type: String, default: 'desktop' },
+    browser: { type: String, default: '' },
+    screenWidth: { type: Number },
+    screenHeight: { type: Number },
+  },
+  createdAt: { type: Date, default: Date.now, index: true, expires: 7776000 }, // 90 gün TTL
+});
+
+// Compound index for efficient queries
+activityLogSchema.index({ userId: 1, createdAt: -1 });
+activityLogSchema.index({ event: 1, createdAt: -1 });
+activityLogSchema.index({ category: 1, createdAt: -1 });
+
+const ActivityLog = mongoose.model('ActivityLog', activityLogSchema);
+
+/* =========================================================
   3) Mini RAG - ürünler
   ========================================================= */
 const SHADLESS_PRODUCTS = [
@@ -2216,6 +2247,138 @@ app.get('/admin/stats', adminAuthMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error('Stats error:', err);
+    return res.status(500).json({ error: 'Sunucu hatası' });
+  }
+});
+
+/* =========================================================
+  KULLANICI DAVRANIŞ TAKİBİ API
+  ========================================================= */
+
+// Batch activity log endpoint
+app.post('/api/activity', async (req, res) => {
+  try {
+    const { events, sessionId, userId, device } = req.body;
+
+    if (!events || !Array.isArray(events) || events.length === 0) {
+      return res.status(400).json({ error: 'events array gerekli' });
+    }
+
+    // Max 50 event per batch
+    const batch = events.slice(0, 50).map(evt => ({
+      userId: userId || 'anonymous',
+      sessionId: sessionId || 'unknown',
+      event: evt.event,
+      category: evt.category || 'interaction',
+      data: evt.data || {},
+      page: evt.page || '',
+      duration: evt.duration || 0,
+      device: device || {},
+      createdAt: evt.timestamp ? new Date(evt.timestamp) : new Date(),
+    }));
+
+    await ActivityLog.insertMany(batch, { ordered: false });
+
+    return res.json({ ok: true, count: batch.length });
+  } catch (err) {
+    console.error('Activity log error:', err.message);
+    return res.json({ ok: true }); // Client'ı bloklamayalım
+  }
+});
+
+// Admin: Davranış istatistikleri
+app.get('/admin/activity-stats', adminAuthMiddleware, async (req, res) => {
+  try {
+    const { days = 7 } = req.query;
+    const since = new Date();
+    since.setDate(since.getDate() - parseInt(days));
+
+    // Toplam benzersiz kullanıcı
+    const uniqueUsers = await ActivityLog.distinct('userId', {
+      createdAt: { $gte: since },
+    });
+
+    // Toplam oturum
+    const uniqueSessions = await ActivityLog.distinct('sessionId', {
+      createdAt: { $gte: since },
+    });
+
+    // Event dağılımı
+    const eventBreakdown = await ActivityLog.aggregate([
+      { $match: { createdAt: { $gte: since } } },
+      { $group: { _id: '$event', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 20 },
+    ]);
+
+    // Günlük aktif kullanıcı
+    const dailyActive = await ActivityLog.aggregate([
+      { $match: { createdAt: { $gte: since } } },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            userId: '$userId',
+          },
+        },
+      },
+      {
+        $group: {
+          _id: '$_id.date',
+          activeUsers: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // Sayfa görüntüleme dağılımı
+    const pageViews = await ActivityLog.aggregate([
+      { $match: { createdAt: { $gte: since }, event: 'page_view' } },
+      { $group: { _id: '$page', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]);
+
+    // Ortalama oturum süresi
+    const avgSession = await ActivityLog.aggregate([
+      { $match: { createdAt: { $gte: since }, event: 'session_end' } },
+      { $group: { _id: null, avgDuration: { $avg: '$duration' } } },
+    ]);
+
+    // Mod kullanım dağılımı
+    const modeUsage = await ActivityLog.aggregate([
+      { $match: { createdAt: { $gte: since }, event: 'mode_change' } },
+      { $group: { _id: '$data.mode', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]);
+
+    // Saatlik aktivite yoğunluğu
+    const hourlyActivity = await ActivityLog.aggregate([
+      { $match: { createdAt: { $gte: since } } },
+      { $group: { _id: { $hour: '$createdAt' }, count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // Cihaz dağılımı
+    const deviceBreakdown = await ActivityLog.aggregate([
+      { $match: { createdAt: { $gte: since } } },
+      { $group: { _id: '$device.type', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]);
+
+    return res.json({
+      period: `${days} gün`,
+      totalUniqueUsers: uniqueUsers.length,
+      totalSessions: uniqueSessions.length,
+      avgSessionDuration: avgSession[0]?.avgDuration || 0,
+      eventBreakdown,
+      dailyActiveUsers: dailyActive,
+      pageViews,
+      modeUsage,
+      hourlyActivity,
+      deviceBreakdown,
+    });
+  } catch (err) {
+    console.error('Activity stats error:', err);
     return res.status(500).json({ error: 'Sunucu hatası' });
   }
 });
