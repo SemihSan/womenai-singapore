@@ -2548,6 +2548,187 @@ app.get('/admin/chat-stats', adminAuthMiddleware, async (req, res) => {
 });
 
 /* =========================================================
+  POPÜLER SORULAR ANALİZİ API
+  ========================================================= */
+
+// Türkçe stop words (analiz dışı bırakılacak kelimeler)
+const TURKISH_STOP_WORDS = new Set([
+  'bir', 'bu', 'şu', 'o', 've', 'ile', 'de', 'da', 'mi', 'mı', 'mu', 'mü',
+  'ne', 'nasıl', 'için', 'ben', 'sen', 'biz', 'siz', 'var', 'yok', 'çok',
+  'daha', 'en', 'gibi', 'olan', 'olarak', 'bana', 'beni', 'benim', 'sana',
+  'lütfen', 'evet', 'hayır', 'tamam', 'iyi', 'ama', 'fakat', 'veya', 'ya',
+  'her', 'tüm', 'olan', 'olur', 'olabilir', 'lazım', 'gerek', 'kadar',
+  'sonra', 'önce', 'arasında', 'üzerinde', 'altında', 'içinde', 'hakkında',
+  'merhaba', 'selam', 'teşekkür', 'teşekkürler', 'sağol', 'ederim', 'ederiz',
+  'biraz', 'bazı', 'böyle', 'şöyle', 'öyle', 'hangisi', 'hangi', 'neden',
+  'nerede', 'nereden', 'nereye', 'neler', 'kim', 'kimin', 'kime',
+  'güzel', 'bakar', 'misin', 'musun', 'söyler', 'yapar', 'eder',
+  'the', 'is', 'a', 'an', 'and', 'or', 'to', 'in', 'on', 'at', 'for',
+]);
+
+// Konu kategorileri ve anahtar kelimeler
+const TOPIC_CATEGORIES = {
+  'Cilt Bakımı': ['cilt', 'bakım', 'rutin', 'temizleme', 'temizleyici', 'nemlendirici', 'serum', 'tonik', 'maske', 'peeling', 'gözenek', 'pürüz', 'gece', 'sabah'],
+  'Güneş Koruması': ['güneş', 'spf', 'koruma', 'güneş kremi', 'uv', 'bronzlaşma', 'leke'],
+  'Akne & Sivilce': ['akne', 'sivilce', 'siyah nokta', 'beyaz nokta', 'kızarıklık', 'iltihap', 'iz', 'yara'],
+  'Yaşlanma Karşıtı': ['kırışıklık', 'yaşlanma', 'anti-aging', 'retinol', 'kolajen', 'sıkılaştırma', 'elastikiyet', 'botoks'],
+  'Saç Bakımı': ['saç', 'şampuan', 'saç bakımı', 'dökülme', 'kepek', 'kırılma', 'saç maskesi'],
+  'Beslenme & Diyet': ['beslenme', 'diyet', 'yemek', 'kalori', 'protein', 'vitamin', 'mineral', 'su', 'besin', 'gıda', 'tarif', 'yiyecek'],
+  'Makyaj': ['makyaj', 'fondöten', 'ruj', 'far', 'maskara', 'kapatıcı', 'allık', 'pudra', 'eyeliner'],
+  'Vücut Bakımı': ['vücut', 'selülit', 'çatlak', 'bacak', 'kol', 'el', 'ayak', 'tırnak'],
+  'Hassas Cilt': ['hassas', 'hassasiyet', 'tahriş', 'alerji', 'alerjik', 'kızarma', 'yanma', 'batma'],
+  'Motivasyon': ['motivasyon', 'özgüven', 'mutlu', 'güzel', 'kendimi', 'moral', 'destek', 'stres'],
+};
+
+// Popüler sorular endpoint
+app.get('/admin/popular-questions', adminAuthMiddleware, async (req, res) => {
+  try {
+    const { days = 30, limit = 50 } = req.query;
+    const since = new Date();
+    since.setDate(since.getDate() - parseInt(days));
+
+    // Tüm kullanıcı mesajlarını çek
+    const chats = await Chat.aggregate([
+      { $unwind: '$messages' },
+      { $match: {
+        'messages.role': 'user',
+        'messages.timestamp': { $gte: since },
+      }},
+      { $project: {
+        content: '$messages.content',
+        timestamp: '$messages.timestamp',
+        mode: 1,
+        userId: 1,
+      }},
+      { $sort: { timestamp: -1 } },
+      { $limit: parseInt(limit) * 20 }, // Analiz için fazla çek
+    ]);
+
+    if (chats.length === 0) {
+      return res.json({
+        totalQuestions: 0,
+        topQuestions: [],
+        categories: [],
+        wordFrequency: [],
+        questionsByMode: [],
+        dailyQuestionTrend: [],
+        avgQuestionLength: 0,
+      });
+    }
+
+    // 1) Mesajları temizle ve normalize et
+    const allMessages = chats.map(c => ({
+      content: c.content.trim().toLowerCase(),
+      original: c.content.trim(),
+      mode: c.mode,
+      timestamp: c.timestamp,
+      userId: c.userId,
+    }));
+
+    // 2) Benzer soruları grupla (basit benzerlik - ilk 40 karakter)
+    const questionGroups = {};
+    allMessages.forEach(msg => {
+      if (msg.content.length < 5) return; // Çok kısa mesajları atla
+      const key = msg.content.substring(0, 40).replace(/[?!.,;:]/g, '').trim();
+      if (!questionGroups[key]) {
+        questionGroups[key] = {
+          sample: msg.original,
+          count: 0,
+          modes: {},
+          users: new Set(),
+        };
+      }
+      questionGroups[key].count++;
+      questionGroups[key].modes[msg.mode] = (questionGroups[key].modes[msg.mode] || 0) + 1;
+      questionGroups[key].users.add(msg.userId);
+    });
+
+    // Top sorular
+    const topQuestions = Object.values(questionGroups)
+      .map(g => ({
+        question: g.sample.length > 80 ? g.sample.substring(0, 80) + '...' : g.sample,
+        count: g.count,
+        uniqueUsers: g.users.size,
+        modes: g.modes,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, parseInt(limit));
+
+    // 3) Kelime frekansı analizi
+    const wordCounts = {};
+    allMessages.forEach(msg => {
+      const words = msg.content
+        .replace(/[?!.,;:'"()\[\]{}]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !TURKISH_STOP_WORDS.has(w));
+      
+      words.forEach(word => {
+        wordCounts[word] = (wordCounts[word] || 0) + 1;
+      });
+    });
+
+    const wordFrequency = Object.entries(wordCounts)
+      .map(([word, count]) => ({ word, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 40);
+
+    // 4) Kategori analizi
+    const categoryCounts = {};
+    allMessages.forEach(msg => {
+      for (const [category, keywords] of Object.entries(TOPIC_CATEGORIES)) {
+        const found = keywords.some(kw => msg.content.includes(kw));
+        if (found) {
+          categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+        }
+      }
+    });
+
+    const categories = Object.entries(categoryCounts)
+      .map(([name, count]) => ({
+        name,
+        count,
+        percentage: Math.round((count / allMessages.length) * 100),
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // 5) Mode bazlı soru dağılımı
+    const modeQuestions = {};
+    allMessages.forEach(msg => {
+      modeQuestions[msg.mode] = (modeQuestions[msg.mode] || 0) + 1;
+    });
+    const questionsByMode = Object.entries(modeQuestions)
+      .map(([mode, count]) => ({ mode, count }))
+      .sort((a, b) => b.count - a.count);
+
+    // 6) Günlük soru trendi
+    const dailyCounts = {};
+    allMessages.forEach(msg => {
+      const day = msg.timestamp.toISOString().split('T')[0];
+      dailyCounts[day] = (dailyCounts[day] || 0) + 1;
+    });
+    const dailyQuestionTrend = Object.entries(dailyCounts)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // 7) Ortalama soru uzunluğu
+    const avgLen = Math.round(allMessages.reduce((s, m) => s + m.content.length, 0) / allMessages.length);
+
+    return res.json({
+      totalQuestions: allMessages.length,
+      topQuestions,
+      categories,
+      wordFrequency,
+      questionsByMode,
+      dailyQuestionTrend,
+      avgQuestionLength: avgLen,
+    });
+  } catch (err) {
+    console.error('Popular questions error:', err);
+    return res.status(500).json({ error: 'Sunucu hatası' });
+  }
+});
+
+/* =========================================================
   HATIRLATICI SİSTEMİ (Scheduler)
   ========================================================= */
 

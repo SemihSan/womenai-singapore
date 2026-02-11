@@ -702,6 +702,58 @@
                     <div id="dauChart" class="bar-chart"></div>
                 </div>
 
+                <!-- ==================== POPÜLER SORULAR ANALİZİ ==================== -->
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;">
+                    <h2 style="color:white;font-size:22px;margin:0;">🔍 Popüler Sorular Analizi</h2>
+                    <button class="period-btn active" onclick="loadPopularQuestions()" style="font-size:12px;">🔄 Yenile</button>
+                </div>
+
+                <!-- Kategori Dağılımı + Kelime Bulutu -->
+                <div class="chart-row">
+                    <div class="chart-box">
+                        <h3>📂 Konu Kategorileri</h3>
+                        <div id="categoryBars" style="display:flex;flex-direction:column;gap:8px;"></div>
+                    </div>
+                    <div class="chart-box">
+                        <h3>☁️ Kelime Bulutu</h3>
+                        <div id="wordCloud" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;min-height:160px;"></div>
+                    </div>
+                </div>
+
+                <!-- Top Sorular Tablosu -->
+                <div class="chart-box" style="margin-bottom:25px;">
+                    <h3>❓ En Çok Sorulan Sorular (Top 20)</h3>
+                    <div style="display:flex;gap:10px;margin-bottom:12px;font-size:12px;color:#888;">
+                        <span>Toplam Soru: <strong id="pqTotal" style="color:#667eea;">0</strong></span>
+                        <span>|</span>
+                        <span>Ort. Uzunluk: <strong id="pqAvgLen" style="color:#667eea;">0</strong> karakter</span>
+                    </div>
+                    <table class="data-table" id="topQuestionsTable">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Soru</th>
+                                <th>Tekrar</th>
+                                <th>Kullanıcı</th>
+                                <th>Mod</th>
+                            </tr>
+                        </thead>
+                        <tbody id="topQuestionsBody"></tbody>
+                    </table>
+                </div>
+
+                <!-- Günlük Soru Trendi + Mod Dağılımı -->
+                <div class="chart-row">
+                    <div class="chart-box">
+                        <h3>📈 Günlük Soru Trendi</h3>
+                        <div id="questionTrendChart" class="bar-chart"></div>
+                    </div>
+                    <div class="chart-box">
+                        <h3>🎭 Mod Bazlı Soru Dağılımı</h3>
+                        <div id="questionModeChart"></div>
+                    </div>
+                </div>
+
             </div>
 
             <!-- ==================== SETTINGS TAB ==================== -->
@@ -1288,6 +1340,9 @@
                 renderTopUsers(data.topUsers);
                 renderDAUChart(data.dailyActiveUsers);
 
+                // Popüler sorular da yükle
+                loadPopularQuestions(days);
+
             } catch (err) {
                 console.error('Chat stats error:', err);
             }
@@ -1430,6 +1485,143 @@
                     <div class="bar-label">${date}</div>
                 </div>`;
             }).join('');
+        }
+
+        // ========== POPÜLER SORULAR ANALİZİ ==========
+        let popularQuestionsData = null;
+
+        async function loadPopularQuestions(days = 30) {
+            try {
+                const res = await fetch(`/admin/popular-questions?days=${days}&limit=50`, {
+                    headers: { 'x-admin-token': token },
+                });
+                if (res.status === 401) { logout(); return; }
+                const data = await res.json();
+                popularQuestionsData = data;
+
+                // Summary
+                document.getElementById('pqTotal').textContent = data.totalQuestions.toLocaleString();
+                document.getElementById('pqAvgLen').textContent = data.avgQuestionLength;
+
+                // Render
+                renderCategoryBars(data.categories);
+                renderWordCloud(data.wordFrequency);
+                renderTopQuestions(data.topQuestions);
+                renderQuestionTrend(data.dailyQuestionTrend);
+                renderQuestionModeChart(data.questionsByMode);
+            } catch (err) {
+                console.error('Popular questions error:', err);
+            }
+        }
+
+        // Kategori çubuk grafik
+        function renderCategoryBars(data) {
+            const container = document.getElementById('categoryBars');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div style="color:#999;padding:20px;text-align:center;">Veri yok</div>';
+                return;
+            }
+            const max = data[0]?.count || 1;
+            const colors = ['#667eea','#f093fb','#38ef7d','#4facfe','#f5576c','#ffd93d','#6c5ce7','#a29bfe','#fd79a8','#00cec9'];
+            container.innerHTML = data.map((cat, i) => {
+                const w = Math.max((cat.count / max) * 100, 5);
+                return `<div style="display:flex;align-items:center;gap:10px;">
+                    <div style="min-width:120px;font-size:13px;color:#555;text-align:right;">${cat.name}</div>
+                    <div style="flex:1;background:#f0f0f0;border-radius:6px;height:24px;overflow:hidden;">
+                        <div style="width:${w}%;background:${colors[i % colors.length]};height:100%;border-radius:6px;display:flex;align-items:center;padding-left:8px;">
+                            <span style="font-size:11px;font-weight:700;color:white;">${cat.count} (${cat.percentage}%)</span>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // Kelime bulutu
+        function renderWordCloud(data) {
+            const container = document.getElementById('wordCloud');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div style="color:#999;">Veri yok</div>';
+                return;
+            }
+            const max = data[0]?.count || 1;
+            const colors = ['#667eea','#764ba2','#f093fb','#f5576c','#38ef7d','#4facfe','#ffd93d','#6c5ce7','#a29bfe','#fd79a8'];
+            container.innerHTML = data.slice(0, 30).map((w, i) => {
+                const size = Math.max(11, Math.min(32, 11 + (w.count / max) * 24));
+                const opacity = 0.5 + (w.count / max) * 0.5;
+                const color = colors[i % colors.length];
+                return `<span style="font-size:${size}px;font-weight:${size > 20 ? 700 : 500};color:${color};opacity:${opacity};cursor:default;padding:2px 4px;" title="${w.word}: ${w.count} kez">${w.word}</span>`;
+            }).join('');
+        }
+
+        // Top sorular tablosu
+        function renderTopQuestions(data) {
+            const body = document.getElementById('topQuestionsBody');
+            if (!data || data.length === 0) {
+                body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;padding:20px;">Veri yok</td></tr>';
+                return;
+            }
+            const modeLabels = { care: '🧴', motivation: '💪', diet: '🥗' };
+            body.innerHTML = data.slice(0, 20).map((q, i) => {
+                const modeIcons = Object.entries(q.modes || {}).map(([m, c]) => `${modeLabels[m] || m} ${c}`).join(' ');
+                const bg = i < 3 ? ['#FFD700','#C0C0C0','#CD7F32'][i] : '#667eea';
+                return `<tr>
+                    <td><span class="rank-badge" style="background:${bg}">${i + 1}</span></td>
+                    <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${q.question}">${q.question}</td>
+                    <td><strong>${q.count}</strong></td>
+                    <td>${q.uniqueUsers}</td>
+                    <td style="font-size:12px;">${modeIcons}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        // Günlük soru trendi
+        function renderQuestionTrend(data) {
+            const container = document.getElementById('questionTrendChart');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div style="color:#999;text-align:center;padding:40px;">Veri yok</div>';
+                return;
+            }
+            const max = Math.max(...data.map(d => d.count), 1);
+            const recent = data.slice(-14);
+            container.innerHTML = recent.map(d => {
+                const h = Math.max((d.count / max) * 100, 3);
+                const date = d.date.slice(5);
+                return `<div class="bar-col">
+                    <div class="bar-value">${d.count}</div>
+                    <div class="bar" style="height:${h}%;background:linear-gradient(to top,#f093fb,#f5576c)"></div>
+                    <div class="bar-label">${date}</div>
+                </div>`;
+            }).join('');
+        }
+
+        // Mod bazlı soru dağılımı
+        function renderQuestionModeChart(data) {
+            const container = document.getElementById('questionModeChart');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div style="color:#999;text-align:center;padding:40px;">Veri yok</div>';
+                return;
+            }
+            const total = data.reduce((s, d) => s + d.count, 0);
+            const colors = { care: '#667eea', motivation: '#f093fb', diet: '#38ef7d' };
+            const labels = { care: '🧴 Bakım', motivation: '💪 Motivasyon', diet: '🥗 Beslenme' };
+
+            container.innerHTML = `
+                <div style="display:flex;flex-direction:column;gap:12px;padding:10px 0;">
+                    ${data.map(d => {
+                        const pct = Math.round((d.count / total) * 100);
+                        const color = colors[d.mode] || '#ccc';
+                        return `<div>
+                            <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px;">
+                                <span>${labels[d.mode] || d.mode}</span>
+                                <span style="font-weight:700;color:${color};">${d.count} (${pct}%)</span>
+                            </div>
+                            <div style="background:#f0f0f0;border-radius:6px;height:18px;overflow:hidden;">
+                                <div style="width:${pct}%;background:${color};height:100%;border-radius:6px;transition:width 0.5s;"></div>
+                            </div>
+                        </div>`;
+                    }).join('')}
+                </div>
+            `;
         }
     </script>
 </body>
