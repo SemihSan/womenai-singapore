@@ -198,7 +198,7 @@ mongoose
   ========================================================= */
 const chatSchema = new mongoose.Schema({
   userId: { type: String, required: true, index: true },
-  title: { type: String, default: 'Yeni Sohbet' }, // Sohbet başlığı
+  title: { type: String, default: '' }, // Sohbet başlığı (frontend i18n handles display)
   mode: { type: String, enum: ['care', 'motivation', 'diet'], default: 'care' }, // Mod
   isArchived: { type: Boolean, default: false }, // Arşivlenmiş mi
   isFavorite: { type: Boolean, default: false }, // Favori mi
@@ -866,7 +866,7 @@ async function handleUnifiedChatAPI(req, res) {
 
         const chat = new Chat({
           userId,
-          title: 'Yeni Sohbet',
+          title: '',
           mode: mode || 'care',
           messages: [],
         });
@@ -1885,7 +1885,7 @@ app.post('/api/chat/new', chatLimiter, async (req, res) => {
     const chat = new Chat({
       userId,
       mode,
-      title: 'Yeni Sohbet',
+      title: '',
       messages: [],
     });
 

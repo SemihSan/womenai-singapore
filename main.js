@@ -1590,12 +1590,14 @@ function renderChatHistory(chats) {
     return;
   }
   
-  elements.chatHistory.innerHTML = chats.map(chat => `
-    <div class="chat-list-item ${chat._id === currentChatId ? 'active' : ''}" 
+  elements.chatHistory.innerHTML = chats.map(chat => {
+    // Başlık yoksa veya eski Türkçe default ise çevirilmiş versiyonu göster
+    const title = (!chat.title || chat.title === 'Yeni Sohbet') ? t('nav.newChat') : chat.title;
+    return `<div class="chat-list-item ${chat._id === currentChatId ? 'active' : ''}" 
          data-id="${chat._id}">
-      ${chat.title || t('nav.newChat')}
-    </div>
-  `).join('');
+      ${title}
+    </div>`;
+  }).join('');
   
   // Add click handlers
   elements.chatHistory.querySelectorAll('.chat-list-item').forEach(item => {
@@ -2039,6 +2041,18 @@ function initLangSelector() {
   // Dışına tıklayınca kapat
   document.addEventListener('click', () => {
     selector.classList.remove('open');
+  });
+
+  // Dil değiştiğinde dinamik içerikleri güncelle
+  window.addEventListener('languageChanged', () => {
+    // Sohbet geçmişini yeniden render et
+    if (currentUser) loadChatHistory();
+    // Bildirim butonunu güncelle
+    const notifBtn = document.getElementById('notification-toggle');
+    if (notifBtn) {
+      const enabled = Notification.permission === 'granted';
+      notifBtn.textContent = enabled ? t('notification.on') : t('notification.off');
+    }
   });
 }
 
