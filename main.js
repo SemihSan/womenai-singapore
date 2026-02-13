@@ -23,6 +23,144 @@ function trackEvent(eventName, params = {}) {
 }
 
 // ========================================
+// i18n - ÇOK DİLLİ DESTEK SİSTEMİ
+// ========================================
+const I18n = (() => {
+  let currentLang = 'tr';
+  let translations = {};
+  let loaded = false;
+  const supportedLangs = ['tr', 'en', 'zh'];
+  const langLabels = { tr: 'Türkçe', en: 'English', zh: '中文' };
+
+  // Nested key erişimi: t('survey.title') => translations.survey.title
+  function getNestedValue(obj, path) {
+    return path.split('.').reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : null), obj);
+  }
+
+  // Dil dosyasını yükle
+  async function loadLanguage(lang) {
+    if (!supportedLangs.includes(lang)) lang = 'tr';
+    try {
+      const res = await fetch(`/lang/${lang}.json?v=${Date.now()}`);
+      if (!res.ok) throw new Error('Dil dosyası yüklenemedi');
+      translations = await res.json();
+      currentLang = lang;
+      loaded = true;
+      localStorage.setItem('womenai_lang', lang);
+      document.documentElement.setAttribute('lang', lang);
+    } catch (err) {
+      console.error(`❌ Dil yüklenemedi (${lang}):`, err);
+      if (lang !== 'tr') {
+        // Fallback: Türkçe'ye dön
+        await loadLanguage('tr');
+      }
+    }
+  }
+
+  // Çeviri al - t('login.title') veya t('survey.stepLabel', {current: 1, total: 4})
+  function t(key, params) {
+    const value = getNestedValue(translations, key);
+    if (value === null || value === undefined) return key;
+    if (typeof value !== 'string') return value;
+    if (!params) return value;
+    // {current} {total} gibi placeholder'ları değiştir
+    return value.replace(/\{(\w+)\}/g, (_, k) => (params[k] !== undefined ? params[k] : `{${k}}`));
+  }
+
+  // DOM'daki tüm data-i18n elementlerini güncelle
+  function applyTranslations() {
+    // data-i18n: textContent değiştir
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      const val = t(key);
+      if (val && val !== key) el.textContent = val;
+    });
+
+    // data-i18n-placeholder: placeholder değiştir
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      const key = el.getAttribute('data-i18n-placeholder');
+      const val = t(key);
+      if (val && val !== key) el.placeholder = val;
+    });
+
+    // data-i18n-title: title/aria-label değiştir
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+      const key = el.getAttribute('data-i18n-title');
+      const val = t(key);
+      if (val && val !== key) {
+        el.title = val;
+        el.setAttribute('aria-label', val);
+      }
+    });
+
+    // data-i18n-html: innerHTML değiştir
+    document.querySelectorAll('[data-i18n-html]').forEach(el => {
+      const key = el.getAttribute('data-i18n-html');
+      const val = t(key);
+      if (val && val !== key) el.innerHTML = val;
+    });
+
+    // Quick action data-prompt güncelle
+    document.querySelectorAll('.quick-action-btn').forEach(btn => {
+      const promptKey = btn.getAttribute('data-i18n-prompt');
+      if (promptKey) {
+        const val = t(promptKey);
+        if (val && val !== promptKey) btn.setAttribute('data-prompt', val);
+      }
+    });
+
+    // Page title güncelle
+    const title = t('meta.title');
+    if (title && title !== 'meta.title') document.title = title;
+  }
+
+  // Dil değiştir
+  async function setLanguage(lang) {
+    await loadLanguage(lang);
+    applyTranslations();
+    // Dil seçici UI güncelle
+    updateLangSelector();
+    // Custom event yayınla
+    window.dispatchEvent(new CustomEvent('languageChanged', { detail: { lang } }));
+  }
+
+  function updateLangSelector() {
+    const btn = document.getElementById('lang-selector-btn');
+    if (btn) {
+      const label = btn.querySelector('.lang-label');
+      if (label) label.textContent = langLabels[currentLang] || currentLang;
+    }
+    // Dropdown active state
+    document.querySelectorAll('.lang-option').forEach(opt => {
+      opt.classList.toggle('active', opt.dataset.lang === currentLang);
+    });
+  }
+
+  // Başlat
+  async function init() {
+    const saved = localStorage.getItem('womenai_lang');
+    const lang = saved && supportedLangs.includes(saved) ? saved : 'tr';
+    await loadLanguage(lang);
+    applyTranslations();
+    updateLangSelector();
+  }
+
+  return {
+    init,
+    t,
+    setLanguage,
+    applyTranslations,
+    get currentLang() { return currentLang; },
+    get supportedLangs() { return supportedLangs; },
+    get langLabels() { return langLabels; },
+    get loaded() { return loaded; },
+  };
+})();
+
+// Kısa erişim
+function t(key, params) { return I18n.t(key, params); }
+
+// ========================================
 // KULLANICI DAVRANIŞI TAKİP SİSTEMİ
 // ========================================
 const BehaviorTracker = (() => {
@@ -265,7 +403,7 @@ let googleClientId = null; // Client ID'yi sakla
 // Google popup ile giriş yap (One Tap çalışmazsa fallback)
 function openGoogleSignInPopup() {
   if (!googleClientId) {
-    alert('Google Sign-In yüklenemedi. Sayfayı yenileyin.');
+    alert(t('common.googleLoadError'));
     return;
   }
   
@@ -351,11 +489,11 @@ async function handleGoogleSignIn(response) {
       console.log('✅ Google ile giriş başarılı:', data.user.name);
     } else {
       console.error('Google giriş hatası:', data.error);
-      alert('Giriş başarısız: ' + (data.error || 'Bilinmeyen hata'));
+      alert(t('common.loginFailed') + ': ' + (data.error || ''));
     }
   } catch (err) {
     console.error('Google auth error:', err);
-    alert('Giriş sırasında bir hata oluştu');
+    alert(t('common.loginError'));
   } finally {
     isGoogleSignInProgress = false;
     // Butonları tekrar aktif et
@@ -475,7 +613,7 @@ function updateUserUI() {
     
     const avatarUrl = isValidAvatarUrl(currentUser.picture) ? currentUser.picture : defaultAvatar;
     if (userAvatar) userAvatar.src = avatarUrl;
-    if (userName) userName.textContent = currentUser.name || 'Kullanıcı';
+    if (userName) userName.textContent = currentUser.name || t('profile.user');
     if (userEmail) userEmail.textContent = currentUser.email || '';
   } else {
     // Misafir kullanıcı
@@ -762,7 +900,7 @@ function hideNotificationPrompt() {
 function updateNotificationUI(enabled) {
   const btn = document.getElementById('notification-toggle');
   if (btn) {
-    btn.textContent = enabled ? '🔔 Bildirimler Açık' : '🔕 Bildirimleri Aç';
+    btn.textContent = enabled ? t('notification.on') : t('notification.off');
     btn.classList.toggle('active', enabled);
   }
   
@@ -824,14 +962,14 @@ async function loadReminderSettings() {
 
 async function saveReminderSettings() {
   if (!fcmToken) {
-    showInAppNotification('Hata', 'Önce bildirimleri etkinleştirin');
+    showInAppNotification(t('common.error'), t('common.enableNotifFirst'));
     return;
   }
   
   const saveBtn = document.getElementById('save-reminder-settings');
   if (saveBtn) {
     saveBtn.disabled = true;
-    saveBtn.textContent = '⏳ Kaydediliyor...';
+    saveBtn.textContent = '⏳ ' + t('survey.saving').replace('⏳ ', '');
   }
   
   try {
@@ -857,18 +995,18 @@ async function saveReminderSettings() {
     });
     
     if (response.ok) {
-      showInAppNotification('✅ Kaydedildi', 'Hatırlatıcı ayarlarınız güncellendi');
+      showInAppNotification(t('reminder.saved'), t('reminder.savedDesc'));
       console.log('✅ Hatırlatıcı ayarları kaydedildi');
     } else {
       throw new Error('Kayıt başarısız');
     }
   } catch (err) {
     console.error('Hatırlatıcı kaydetme hatası:', err);
-    showInAppNotification('❌ Hata', 'Ayarlar kaydedilemedi');
+    showInAppNotification('❌ ' + t('common.error'), t('reminder.saveFailed'));
   } finally {
     if (saveBtn) {
       saveBtn.disabled = false;
-      saveBtn.textContent = '💾 Kaydet';
+      saveBtn.textContent = t('reminder.save');
     }
   }
 }
@@ -922,13 +1060,13 @@ function openProfileModal() {
       });
     profileAvatar.src = isValid ? currentUser.picture : defaultAvatar;
   }
-  if (profileName) profileName.textContent = currentUser.name || 'Kullanıcı';
+  if (profileName) profileName.textContent = currentUser.name || t('profile.user');
   if (profileEmail) profileEmail.textContent = currentUser.email || '';
   
   // Bildirim durumu
   const profileNotifications = document.getElementById('profile-notifications');
   if (profileNotifications) {
-    profileNotifications.textContent = pushEnabled ? '🔔 Açık' : '🔕 Kapalı';
+    profileNotifications.textContent = pushEnabled ? t('profile.notifOn') : t('profile.notifOff');
   }
   
   // İstatistikleri yükle
@@ -974,7 +1112,7 @@ async function loadProfileStats() {
         const m = c.mode || 'care';
         modeCounts[m] = (modeCounts[m] || 0) + 1;
       });
-      const modeNames = { care: '🧴 Bakım', motivation: '💪 Motivasyon', diet: '🥗 Beslenme' };
+      const modeNames = { care: t('mode.careFull'), motivation: t('mode.motivationFull'), diet: t('mode.dietFull') };
       const topMode = Object.keys(modeCounts).sort((a, b) => modeCounts[b] - modeCounts[a])[0];
       const favMode = document.getElementById('profile-fav-mode');
       if (favMode) favMode.textContent = topMode ? (modeNames[topMode] || topMode) : '-';
@@ -988,7 +1126,7 @@ async function loadProfileStats() {
       // Üyelik tarihi
       const joinedEl = document.getElementById('profile-joined');
       if (joinedEl && userData.createdAt) {
-        joinedEl.textContent = new Date(userData.createdAt).toLocaleDateString('tr-TR', {
+        joinedEl.textContent = new Date(userData.createdAt).toLocaleDateString(I18n.currentLang === 'zh' ? 'zh-CN' : I18n.currentLang === 'en' ? 'en-US' : 'tr-TR', {
           day: 'numeric', month: 'long', year: 'numeric'
         });
       }
@@ -996,7 +1134,7 @@ async function loadProfileStats() {
       // Son giriş (şimdiki zaman çünkü kullanıcı şu an aktif)
       const lastLoginEl = document.getElementById('profile-last-login');
       if (lastLoginEl) {
-        lastLoginEl.textContent = new Date().toLocaleDateString('tr-TR', {
+        lastLoginEl.textContent = new Date().toLocaleDateString(I18n.currentLang === 'zh' ? 'zh-CN' : I18n.currentLang === 'en' ? 'en-US' : 'tr-TR', {
           day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
         });
       }
@@ -1101,7 +1239,7 @@ function showSurveyStep(step) {
   
   // Step label güncelle
   const label = document.getElementById('survey-step-label');
-  if (label) label.textContent = `Adım ${step}/${TOTAL_STEPS}`;
+  if (label) label.textContent = t('survey.stepLabel', { current: step, total: TOTAL_STEPS });
   
   // Butonları güncelle
   const prevBtn = document.getElementById('survey-prev-btn');
@@ -1109,9 +1247,9 @@ function showSurveyStep(step) {
   if (prevBtn) prevBtn.style.display = step > 1 ? 'block' : 'none';
   if (nextBtn) {
     if (step === TOTAL_STEPS) {
-      nextBtn.textContent = '💾 Kaydet';
+      nextBtn.textContent = t('survey.saveBtn');
     } else {
-      nextBtn.textContent = 'Devam →';
+      nextBtn.textContent = t('survey.nextBtn');
     }
   }
   
@@ -1154,17 +1292,17 @@ function buildSurveySummary() {
   const summary = document.getElementById('survey-summary');
   if (!summary) return;
   
-  const skinTypeNames = { kuru: '💧 Kuru', yagli: '✨ Yağlı', karma: '🔄 Karma', normal: '😊 Normal', hassas: '🌸 Hassas' };
-  const genderNames = { kadin: '👩 Kadın', erkek: '👨 Erkek', 'belirtmek-istemiyorum': '🤐 Belirtmek İstemiyorum' };
+  const skinTypeNames = { kuru: t('survey.skinDry'), yagli: t('survey.skinOily'), karma: t('survey.skinCombo'), normal: t('survey.skinNormal'), hassas: t('survey.skinSensitive') };
+  const genderNames = { kadin: t('survey.female'), erkek: t('survey.male'), 'belirtmek-istemiyorum': t('survey.notSpecify') };
   
   let html = '';
-  html += `<div class="survey-summary-item"><span class="survey-summary-label">Cilt Tipi</span><span class="survey-summary-value">${skinTypeNames[data.skinType] || '—'}</span></div>`;
-  html += `<div class="survey-summary-item"><span class="survey-summary-label">Cilt Sorunları</span><span class="survey-summary-value">${data.skinConcerns.length > 0 ? data.skinConcerns.join(', ') : '—'}</span></div>`;
-  html += `<div class="survey-summary-item"><span class="survey-summary-label">Yaş Aralığı</span><span class="survey-summary-value">${data.age || '—'}</span></div>`;
-  html += `<div class="survey-summary-item"><span class="survey-summary-label">Cinsiyet</span><span class="survey-summary-value">${genderNames[data.gender] || '—'}</span></div>`;
-  html += `<div class="survey-summary-item"><span class="survey-summary-label">Bölge</span><span class="survey-summary-value">${data.region || '—'}</span></div>`;
-  html += `<div class="survey-summary-item"><span class="survey-summary-label">Alerjiler</span><span class="survey-summary-value">${data.allergies.length > 0 ? data.allergies.join(', ') : '—'}</span></div>`;
-  html += `<div class="survey-summary-item"><span class="survey-summary-label">Hassasiyetler</span><span class="survey-summary-value">${data.sensitivities.length > 0 ? data.sensitivities.join(', ') : '—'}</span></div>`;
+  html += `<div class="survey-summary-item"><span class="survey-summary-label">${t('survey.summaryLabels.skinType')}</span><span class="survey-summary-value">${skinTypeNames[data.skinType] || '—'}</span></div>`;
+  html += `<div class="survey-summary-item"><span class="survey-summary-label">${t('survey.summaryLabels.skinConcerns')}</span><span class="survey-summary-value">${data.skinConcerns.length > 0 ? data.skinConcerns.join(', ') : '—'}</span></div>`;
+  html += `<div class="survey-summary-item"><span class="survey-summary-label">${t('survey.summaryLabels.ageRange')}</span><span class="survey-summary-value">${data.age || '—'}</span></div>`;
+  html += `<div class="survey-summary-item"><span class="survey-summary-label">${t('survey.summaryLabels.gender')}</span><span class="survey-summary-value">${genderNames[data.gender] || '—'}</span></div>`;
+  html += `<div class="survey-summary-item"><span class="survey-summary-label">${t('survey.summaryLabels.region')}</span><span class="survey-summary-value">${data.region || '—'}</span></div>`;
+  html += `<div class="survey-summary-item"><span class="survey-summary-label">${t('survey.summaryLabels.allergies')}</span><span class="survey-summary-value">${data.allergies.length > 0 ? data.allergies.join(', ') : '—'}</span></div>`;
+  html += `<div class="survey-summary-item"><span class="survey-summary-label">${t('survey.summaryLabels.sensitivities')}</span><span class="survey-summary-value">${data.sensitivities.length > 0 ? data.sensitivities.join(', ') : '—'}</span></div>`;
   
   summary.innerHTML = html;
 }
@@ -1175,7 +1313,7 @@ async function saveSurveyData() {
   const nextBtn = document.getElementById('survey-next-btn');
   if (nextBtn) {
     nextBtn.disabled = true;
-    nextBtn.textContent = '⏳ Kaydediliyor...';
+    nextBtn.textContent = t('survey.saving');
   }
   
   try {
@@ -1192,7 +1330,7 @@ async function saveSurveyData() {
     
     if (response.ok) {
       closeSurveyModal();
-      showInAppNotification('✅ Profil Kaydedildi', 'Artık sana özel öneriler alacaksın!');
+      showInAppNotification(t('common.profileSaved'), t('common.profileSavedDesc'));
       trackEvent('survey_complete', { skin_type: data.skinType, age: data.age, region: data.region });
       
       // Profil butonu güncelle
@@ -1202,11 +1340,11 @@ async function saveSurveyData() {
     }
   } catch (err) {
     console.error('Anket kayıt hatası:', err);
-    showInAppNotification('❌ Hata', 'Profil kaydedilemedi');
+    showInAppNotification('❌ ' + t('common.error'), t('common.profileSaveFailed'));
   } finally {
     if (nextBtn) {
       nextBtn.disabled = false;
-      nextBtn.textContent = '💾 Kaydet';
+      nextBtn.textContent = t('survey.saveBtn');
     }
   }
 }
@@ -1270,8 +1408,8 @@ function updateSurveyButton(isComplete) {
   if (isComplete) {
     if (btn) btn.classList.add('completed');
     if (icon) icon.textContent = '✅';
-    if (text) text.textContent = 'Profilini Düzenle';
-    if (hint) hint.textContent = 'Profilin tamamlandı! AI sana özel öneriler verecek.';
+    if (text) text.textContent = t('profile.surveyEdit');
+    if (hint) hint.textContent = t('profile.surveyComplete');
   }
 }
 
@@ -1442,20 +1580,20 @@ async function loadChatHistory() {
     renderChatHistory(data.chats || []);
   } catch (error) {
     console.error('Chat history load error:', error);
-    elements.chatHistory.innerHTML = '<div class="chat-list-empty">Yüklenemedi</div>';
+    elements.chatHistory.innerHTML = '<div class="chat-list-empty">' + t('chat.loadFailed') + '</div>';
   }
 }
 
 function renderChatHistory(chats) {
   if (!chats.length) {
-    elements.chatHistory.innerHTML = '<div class="chat-list-empty">Henüz sohbet yok</div>';
+    elements.chatHistory.innerHTML = '<div class="chat-list-empty">' + t('nav.noChats') + '</div>';
     return;
   }
   
   elements.chatHistory.innerHTML = chats.map(chat => `
     <div class="chat-list-item ${chat._id === currentChatId ? 'active' : ''}" 
          data-id="${chat._id}">
-      ${chat.title || 'Yeni Sohbet'}
+      ${chat.title || t('nav.newChat')}
     </div>
   `).join('');
   
@@ -1561,7 +1699,8 @@ async function sendMessage(content = null) {
         chatId: currentChatId, 
         content: text,
         userId: getUserId(),
-        mode: currentMode
+        mode: currentMode,
+        language: I18n.currentLang
       })
     });
     const data = await res.json();
@@ -1584,7 +1723,7 @@ async function sendMessage(content = null) {
     // Add error message
     messages.push({ 
       role: 'assistant', 
-      content: 'Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.' 
+      content: t('chat.errorMessage') 
     });
     renderMessages();
   } finally {
@@ -1601,7 +1740,7 @@ async function sendMessage(content = null) {
 }
 
 async function clearAllChats() {
-  if (!confirm('Tüm sohbet geçmişi silinecek. Emin misiniz?')) return;
+  if (!confirm(t('chat.confirmClear'))) return;
   
   try {
     await fetch(API_URL, {
@@ -1682,8 +1821,8 @@ function closeWeatherModal() {
 
 async function loadWeather() {
   elements.weatherStats.innerHTML = '';
-  elements.weatherAnalysisContent.innerHTML = 'Yükleniyor...';
-  elements.weatherLocation.textContent = 'Konum alınıyor...';
+  elements.weatherAnalysisContent.innerHTML = t('weather.loading');
+  elements.weatherLocation.textContent = t('weather.locating');
   elements.weatherDate.textContent = '';
   
   try {
@@ -1691,40 +1830,41 @@ async function loadWeather() {
     const data = await res.json();
     
     if (data && data.weather) {
-      elements.weatherLocation.textContent = data.weather.location || 'Konum bulunamadı';
-      elements.weatherDate.textContent = data.weather.date || new Date().toLocaleDateString('tr-TR');
+      elements.weatherLocation.textContent = data.weather.location || t('weather.locationNotFound');
+      const dateLocale = I18n.currentLang === 'zh' ? 'zh-CN' : I18n.currentLang === 'en' ? 'en-US' : 'tr-TR';
+      elements.weatherDate.textContent = data.weather.date || new Date().toLocaleDateString(dateLocale);
       elements.weatherHeaderIcon.textContent = data.weather.icon || '🌤️';
       
       elements.weatherStats.innerHTML = `
         <div class="weather-stat">
           <div class="weather-stat-icon">🌡️</div>
           <div class="weather-stat-value">${data.weather.temp || '--'}°C</div>
-          <div class="weather-stat-label">Sıcaklık</div>
+          <div class="weather-stat-label">${t('weather.temp')}</div>
         </div>
         <div class="weather-stat">
           <div class="weather-stat-icon">💧</div>
           <div class="weather-stat-value">${data.weather.humidity || '--'}%</div>
-          <div class="weather-stat-label">Nem</div>
+          <div class="weather-stat-label">${t('weather.humidity')}</div>
         </div>
         <div class="weather-stat">
           <div class="weather-stat-icon">🌬️</div>
           <div class="weather-stat-value">${data.weather.wind || '--'} km/s</div>
-          <div class="weather-stat-label">Rüzgar</div>
+          <div class="weather-stat-label">${t('weather.wind')}</div>
         </div>
         <div class="weather-stat">
           <div class="weather-stat-icon">☀️</div>
           <div class="weather-stat-value">${data.weather.uv || '--'}</div>
-          <div class="weather-stat-label">UV İndeksi</div>
+          <div class="weather-stat-label">${t('weather.uvIndex')}</div>
         </div>
       `;
       
-      elements.weatherAnalysisContent.innerHTML = data.analysis || 'Analiz bulunamadı.';
+      elements.weatherAnalysisContent.innerHTML = data.analysis || t('weather.analysisNotFound');
     } else {
-      elements.weatherAnalysisContent.innerHTML = 'Hava durumu bilgisi alınamadı.';
+      elements.weatherAnalysisContent.innerHTML = t('weather.dataError');
     }
   } catch (error) {
     console.error('Weather load error:', error);
-    elements.weatherAnalysisContent.innerHTML = 'Hava durumu yüklenirken hata oluştu.';
+    elements.weatherAnalysisContent.innerHTML = t('weather.loadError');
   }
 }
 
@@ -1870,16 +2010,53 @@ function initEventListeners() {
   */
 }
 // ========================================
+// LANGUAGE SELECTOR
+// ========================================
+function initLangSelector() {
+  const selector = document.getElementById('lang-selector');
+  const btn = document.getElementById('lang-selector-btn');
+  const dropdown = document.getElementById('lang-dropdown');
+  
+  if (!selector || !btn || !dropdown) return;
+  
+  // Toggle dropdown
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    selector.classList.toggle('open');
+  });
+  
+  // Dil seçimi
+  dropdown.querySelectorAll('.lang-option').forEach(opt => {
+    opt.addEventListener('click', async () => {
+      const lang = opt.dataset.lang;
+      selector.classList.remove('open');
+      await I18n.setLanguage(lang);
+      BehaviorTracker.log('language_change', 'interaction', { language: lang });
+      trackEvent('language_change', { language: lang });
+    });
+  });
+  
+  // Dışına tıklayınca kapat
+  document.addEventListener('click', () => {
+    selector.classList.remove('open');
+  });
+}
+
+// ========================================
 // INITIALIZATION
 // ========================================
 async function init() {
   console.log('🚀 Women AI başlatılıyor...');
+  
+  // i18n başlat (önce dil yüklensin)
+  await I18n.init();
   
   // Davranış takip sistemini başlat
   BehaviorTracker.init();
   
   initTheme();
   initMobileMenu();
+  initLangSelector();
   initEventListeners();
   initReminderSettings(); // Hatırlatıcı ayarları
   initProfilePage(); // Profil sayfası

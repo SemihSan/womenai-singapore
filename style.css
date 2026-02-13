@@ -602,6 +602,93 @@ body {
 }
 
 .theme-toggle,
+/* Language Selector */
+.lang-selector {
+  position: relative;
+  margin: 0 8px;
+}
+
+.lang-selector-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+
+.lang-selector-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.lang-globe {
+  font-size: 16px;
+}
+
+.lang-label {
+  flex: 1;
+  text-align: left;
+}
+
+.lang-arrow {
+  transition: transform 0.2s;
+}
+
+.lang-selector.open .lang-arrow {
+  transform: rotate(180deg);
+}
+
+.lang-dropdown {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  margin-bottom: 4px;
+  overflow: hidden;
+  z-index: 100;
+}
+
+.lang-selector.open .lang-dropdown {
+  display: block;
+}
+
+.lang-option {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: left;
+  transition: var(--transition);
+}
+
+.lang-option:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.lang-option.active {
+  background: var(--bg-active);
+  color: var(--text-brand);
+  font-weight: 600;
+}
+
 .clear-btn {
   display: flex;
   align-items: center;

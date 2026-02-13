@@ -693,8 +693,9 @@ async function handleChat(req, res) {
       await settings.save();
     }
 
-    const { userId, message, pageUrl, mode } = req.body || {};
+    const { userId, message, pageUrl, mode, language } = req.body || {};
     const currentMode = mode || 'care';
+    const userLang = language || 'tr';
 
     if (!message || message.trim().length === 0) {
       return res.status(400).json({ error: 'message gerekli' });
@@ -758,9 +759,16 @@ async function handleChat(req, res) {
 
     const recentMessages = chat.messages.slice(-10).map((m) => ({ role: m.role, content: m.content }));
 
+    // Dil talimatı
+    const langNames = { tr: 'Türkçe', en: 'English', zh: '中文 (Simplified Chinese)' };
+    const langInstruction = userLang !== 'tr' 
+      ? `IMPORTANT: You MUST respond in ${langNames[userLang] || 'English'}. All your answers, recommendations, and conversations must be entirely in ${langNames[userLang] || 'English'}.`
+      : '';
+
     const messages = [
       { role: 'system', content: systemPrompt },
       { role: 'system', content: modePrompt },
+      langInstruction ? { role: 'system', content: langInstruction } : null,
       pageUrl ? { role: 'system', content: `Kullanıcı şu sayfada: ${pageUrl}.` } : null,
       ...recentMessages,
     ].filter(Boolean);
@@ -811,7 +819,7 @@ async function handleChat(req, res) {
   Frontend için tek endpoint üzerinden tüm işlemler
   ========================================================= */
 async function handleUnifiedChatAPI(req, res) {
-  const { action, userId, chatId, content, mode } = req.body;
+  const { action, userId, chatId, content, mode, language: unifiedLang } = req.body;
 
   try {
     switch (action) {
@@ -956,9 +964,17 @@ async function handleUnifiedChatAPI(req, res) {
         // Son 10 mesajı al
         const recentMessages = chat.messages.slice(-10).map((m) => ({ role: m.role, content: m.content }));
 
+        // Dil talimatı
+        const uLang = unifiedLang || 'tr';
+        const uLangNames = { tr: 'Türkçe', en: 'English', zh: '中文 (Simplified Chinese)' };
+        const uLangInstruction = uLang !== 'tr'
+          ? `IMPORTANT: You MUST respond in ${uLangNames[uLang] || 'English'}. All your answers, recommendations, and conversations must be entirely in ${uLangNames[uLang] || 'English'}.`
+          : '';
+
         const apiMessages = [
           { role: 'system', content: (settings.systemPrompt || 'Sen bir kadın yaşam asistanısın.') + profilePrompt },
           modePrompt ? { role: 'system', content: modePrompt } : null,
+          uLangInstruction ? { role: 'system', content: uLangInstruction } : null,
           ...recentMessages,
         ].filter(Boolean);
 
