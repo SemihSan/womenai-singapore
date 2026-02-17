@@ -125,14 +125,9 @@ const I18n = (() => {
   }
 
   function updateLangSelector() {
-    const btn = document.getElementById('lang-selector-btn');
-    if (btn) {
-      const label = btn.querySelector('.lang-label');
-      if (label) label.textContent = langLabels[currentLang] || currentLang;
-    }
-    // Dropdown active state
-    document.querySelectorAll('.lang-option').forEach(opt => {
-      opt.classList.toggle('active', opt.dataset.lang === currentLang);
+    // Flag buttons active state güncelle
+    document.querySelectorAll('.lang-flag').forEach(flag => {
+      flag.classList.toggle('active', flag.dataset.lang === currentLang);
     });
   }
 
@@ -2015,36 +2010,36 @@ function initEventListeners() {
 // LANGUAGE SELECTOR
 // ========================================
 function initLangSelector() {
-  const selector = document.getElementById('lang-selector');
-  const btn = document.getElementById('lang-selector-btn');
-  const dropdown = document.getElementById('lang-dropdown');
+  const switcher = document.getElementById('lang-switcher');
+  if (!switcher) return;
   
-  if (!selector || !btn || !dropdown) return;
+  const flags = switcher.querySelectorAll('.lang-flag');
   
-  // Toggle dropdown
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    selector.classList.toggle('open');
-  });
-  
-  // Dil seçimi
-  dropdown.querySelectorAll('.lang-option').forEach(opt => {
-    opt.addEventListener('click', async () => {
-      const lang = opt.dataset.lang;
-      selector.classList.remove('open');
+  // Dil seçimi - bayrak butonları
+  flags.forEach(flag => {
+    flag.addEventListener('click', async () => {
+      const lang = flag.dataset.lang;
+      // Active state güncelle
+      flags.forEach(f => f.classList.remove('active'));
+      flag.classList.add('active');
+      // Dili değiştir
       await I18n.setLanguage(lang);
       BehaviorTracker.log('language_change', 'interaction', { language: lang });
       trackEvent('language_change', { language: lang });
     });
   });
-  
-  // Dışına tıklayınca kapat
-  document.addEventListener('click', () => {
-    selector.classList.remove('open');
+
+  // Sayfa yüklendiğinde aktif dili işaretle
+  const currentLang = I18n.currentLang || 'tr';
+  flags.forEach(f => {
+    f.classList.toggle('active', f.dataset.lang === currentLang);
   });
 
   // Dil değiştiğinde dinamik içerikleri güncelle
   window.addEventListener('languageChanged', () => {
+    // Bayrak active state güncelle
+    const lang = I18n.currentLang;
+    flags.forEach(f => f.classList.toggle('active', f.dataset.lang === lang));
     // Sohbet geçmişini yeniden render et
     if (currentUser) loadChatHistory();
     // Bildirim butonunu güncelle
@@ -2101,5 +2096,31 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+// ========================================
+// PWA SERVICE WORKER REGISTRATION
+// ========================================
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      console.log('✅ SW registered:', reg.scope);
+
+      // Yeni SW varsa güncelle
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        if (newSW) {
+          newSW.addEventListener('statechange', () => {
+            if (newSW.state === 'activated') {
+              console.log('🔄 Yeni versiyon aktif!');
+            }
+          });
+        }
+      });
+    } catch (err) {
+      console.warn('⚠️ SW registration failed:', err);
+    }
+  });
+}
 
 

@@ -1,0 +1,25 @@
+const fs = require('fs');
+
+const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+
+function makeSvg(size) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c3aed"/>
+      <stop offset="50%" style="stop-color:#a855f7"/>
+      <stop offset="100%" style="stop-color:#ec4899"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="6" fill="url(#grad)"/>
+  <path d="M16 6L8 10L16 14L24 10L16 6Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M8 18L16 22L24 18" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8 14L16 18L24 14" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+}
+
+sizes.forEach(s => {
+  fs.writeFileSync(`icons/icon-${s}.svg`, makeSvg(s));
+});
+
+console.log('SVG icons created for sizes:', sizes.join(', '));

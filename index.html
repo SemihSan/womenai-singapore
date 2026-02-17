@@ -31,10 +31,16 @@
   <!-- Theme Color -->
   <meta name="theme-color" content="#C45C7C">
   
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Women AI">
+  <link rel="apple-touch-icon" href="/icons/icon-192.svg">
+  
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.4">
+  <link rel="stylesheet" href="style.css?v=3.5">
   
   <!-- Google Analytics 4 -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-EV7WSFQLQD"></script>
@@ -225,18 +231,28 @@
         </button>
 
         <!-- Language Selector -->
-        <div class="lang-selector" id="lang-selector">
-          <button class="lang-selector-btn" id="lang-selector-btn">
-            <span class="lang-globe">🌐</span>
-            <span class="lang-label">Türkçe</span>
-            <svg class="lang-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="6 9 12 15 18 9"></polyline>
+        <div class="lang-switcher" id="lang-switcher">
+          <div class="lang-switcher-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
             </svg>
-          </button>
-          <div class="lang-dropdown" id="lang-dropdown">
-            <button class="lang-option active" data-lang="tr">🇹🇷 Türkçe</button>
-            <button class="lang-option" data-lang="en">🇬🇧 English</button>
-            <button class="lang-option" data-lang="zh">🇨🇳 中文</button>
+            <span data-i18n="lang.selector">Dil</span>
+          </div>
+          <div class="lang-flags">
+            <button class="lang-flag active" data-lang="tr" title="Türkçe">
+              <span class="flag-emoji">🇹🇷</span>
+              <span class="flag-label">TR</span>
+            </button>
+            <button class="lang-flag" data-lang="en" title="English">
+              <span class="flag-emoji">🇬🇧</span>
+              <span class="flag-label">EN</span>
+            </button>
+            <button class="lang-flag" data-lang="zh" title="中文">
+              <span class="flag-emoji">🇨🇳</span>
+              <span class="flag-label">ZH</span>
+            </button>
           </div>
         </div>
 
@@ -607,6 +623,6 @@
     </div>
   </div>
 
-  <script src="main.js?v=3.4"></script>
+  <script src="main.js?v=3.5"></script>
 </body>
 </html>
