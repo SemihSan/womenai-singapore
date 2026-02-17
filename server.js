@@ -942,19 +942,21 @@ async function handleUnifiedChatAPI(req, res) {
         // Kullanıcı profil bilgilerini al (kişiselleştirme)
         let profilePrompt = '';
         try {
-          const userIdRaw = userId.replace('google_', '');
-          const userDoc = await User.findById(userIdRaw);
-          if (userDoc && userDoc.profile && userDoc.profile.isProfileComplete) {
-            const p = userDoc.profile;
-            const parts = [];
-            if (p.skinType) parts.push(`Cilt tipi: ${p.skinType}`);
-            if (p.skinConcerns && p.skinConcerns.length > 0) parts.push(`Cilt sorunları: ${p.skinConcerns.join(', ')}`);
-            if (p.age) parts.push(`Yaş aralığı: ${p.age}`);
-            if (p.region) parts.push(`Bölge: ${p.region}`);
-            if (p.allergies && p.allergies.length > 0) parts.push(`Alerjiler: ${p.allergies.join(', ')} - BU İÇERİKLERE DİKKAT ET, ÖNERİLERDE BUNLARDAN KAÇIN!`);
-            if (p.sensitivities && p.sensitivities.length > 0) parts.push(`Hassasiyetler: ${p.sensitivities.join(', ')}`);
-            if (parts.length > 0) {
-              profilePrompt = `\n\n👤 KULLANICI PROFİLİ (önerileri buna göre kişiselleştir):\n${parts.join('\n')}`;
+          if (userId.startsWith('google_')) {
+            const userIdRaw = userId.replace('google_', '');
+            const userDoc = await User.findById(userIdRaw);
+            if (userDoc && userDoc.profile && userDoc.profile.isProfileComplete) {
+              const p = userDoc.profile;
+              const parts = [];
+              if (p.skinType) parts.push(`Cilt tipi: ${p.skinType}`);
+              if (p.skinConcerns && p.skinConcerns.length > 0) parts.push(`Cilt sorunları: ${p.skinConcerns.join(', ')}`);
+              if (p.age) parts.push(`Yaş aralığı: ${p.age}`);
+              if (p.region) parts.push(`Bölge: ${p.region}`);
+              if (p.allergies && p.allergies.length > 0) parts.push(`Alerjiler: ${p.allergies.join(', ')} - BU İÇERİKLERE DİKKAT ET, ÖNERİLERDE BUNLARDAN KAÇIN!`);
+              if (p.sensitivities && p.sensitivities.length > 0) parts.push(`Hassasiyetler: ${p.sensitivities.join(', ')}`);
+              if (parts.length > 0) {
+                profilePrompt = `\n\n👤 KULLANICI PROFİLİ (önerileri buna göre kişiselleştir):\n${parts.join('\n')}`;
+              }
             }
           }
         } catch (profileErr) {

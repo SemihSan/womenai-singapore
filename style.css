@@ -34,9 +34,12 @@
   --gradient-soft: linear-gradient(135deg, #FFEEF2 0%, #FFF5F7 50%, #FFFBFC 100%);
   
   --accent-rose: #C45C7C;
+  --accent-pink: #E8A0B5;
   --accent-gold: #C9956C;
   --accent-lavender: #A890C2;
+  --accent-purple: #8E74B0;
   --accent-mint: #7EB8A0;
+  --text-muted: #A89198;
   
   --radius-sm: 8px;
   --radius-md: 14px;
@@ -557,7 +560,7 @@ body {
   height: 36px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid var(--accent-pink);
+  border: 2px solid var(--accent-rose);
 }
 
 .user-details {
@@ -599,6 +602,23 @@ body {
 .logout-btn:hover {
   background: rgba(239, 68, 68, 0.1);
   color: #ef4444;
+}
+
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: calc(100% - 16px);
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+
+.theme-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .theme-toggle,

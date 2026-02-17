@@ -315,7 +315,7 @@ const BehaviorTracker = (() => {
   // Scroll derinliği takibi
   function trackScrollDepth() {
     let maxScroll = 0;
-    const chatMessages = document.getElementById('chatMessages');
+    const chatMessages = document.getElementById('chat-messages');
     if (!chatMessages) return;
 
     chatMessages.addEventListener('scroll', () => {
@@ -617,7 +617,7 @@ function updateUserUI() {
   }
 }
 
-function initGoogleAuth() {
+async function initGoogleAuth() {
   // URL'den auth bilgisini kontrol et (OAuth callback'ten redirect)
   const urlParams = new URLSearchParams(window.location.search);
   const authData = urlParams.get('auth_success');
@@ -647,9 +647,10 @@ function initGoogleAuth() {
       updateLoginState();
       
       // Sohbetleri yükle
-      loadChatHistory().then(() => startNewChat());
+      await loadChatHistory();
+      await startNewChat();
       
-      return; // Zaten giriş yapıldı, devam etme
+      return true; // OAuth ile giriş yapıldı ve chat yüklendi
     } catch (e) {
       console.error('❌ Auth data parse error:', e);
     }
@@ -705,6 +706,7 @@ function initGoogleAuth() {
 
   // Google Identity Services'ı initialize et
   fetchGoogleClientId();
+  return false; // OAuth callback değil, chat yüklenmedi
 }
 
 async function fetchGoogleClientId() {
@@ -893,11 +895,11 @@ function hideNotificationPrompt() {
 }
 
 function updateNotificationUI(enabled) {
-  const btn = document.getElementById('notification-toggle');
-  if (btn) {
+  // Sidebar'daki bildirim butonlarını güncelle
+  document.querySelectorAll('.notification-toggle-btn').forEach(btn => {
     btn.textContent = enabled ? t('notification.on') : t('notification.off');
     btn.classList.toggle('active', enabled);
-  }
+  });
   
   // Reminder settings'i göster/gizle
   const reminderSettings = document.getElementById('reminder-settings');
@@ -1449,8 +1451,8 @@ function showInAppNotification(title, body) {
   toast.innerHTML = `
     <div class="notification-toast-icon">💜</div>
     <div class="notification-toast-content">
-      <div class="notification-toast-title">${title || 'Women AI'}</div>
-      <div class="notification-toast-body">${body || ''}</div>
+      <div class="notification-toast-title">${(title || 'Women AI').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+      <div class="notification-toast-body">${(body || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
     </div>
     <button class="notification-toast-close">&times;</button>
   `;
@@ -1778,8 +1780,14 @@ function renderMessages() {
 }
 
 function formatMessage(content) {
+  // HTML entity escape (XSS koruması)
+  const escaped = content
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
   // Basic markdown-like formatting
-  return content
+  return escaped
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/\n/g, '<br>');
@@ -1845,7 +1853,7 @@ async function loadWeather() {
         </div>
         <div class="weather-stat">
           <div class="weather-stat-icon">🌬️</div>
-          <div class="weather-stat-value">${data.weather.wind || '--'} km/s</div>
+          <div class="weather-stat-value">${data.weather.wind || '--'} km/h</div>
           <div class="weather-stat-label">${t('weather.wind')}</div>
         </div>
         <div class="weather-stat">
@@ -1855,13 +1863,13 @@ async function loadWeather() {
         </div>
       `;
       
-      elements.weatherAnalysisContent.innerHTML = data.analysis || t('weather.analysisNotFound');
+      elements.weatherAnalysisContent.textContent = data.analysis || t('weather.analysisNotFound');
     } else {
-      elements.weatherAnalysisContent.innerHTML = t('weather.dataError');
+      elements.weatherAnalysisContent.textContent = t('weather.dataError');
     }
   } catch (error) {
     console.error('Weather load error:', error);
-    elements.weatherAnalysisContent.innerHTML = t('weather.loadError');
+    elements.weatherAnalysisContent.textContent = t('weather.loadError');
   }
 }
 
@@ -1942,19 +1950,31 @@ function initEventListeners() {
   
   // SEND BUTTON - Mobil uyumlu event handlers
   if (elements.sendBtn) {
-    // Mouse click (desktop)
-    elements.sendBtn.addEventListener('click', handleSendButton);
+    let isTouching = false;
     
-    // Touch events (mobile)
+    // Touch events (mobile) - touch olduğunda click'i engelle
     elements.sendBtn.addEventListener('touchstart', (e) => {
-      e.preventDefault(); // Çift tıklama engellemesi
-      elements.sendBtn.style.transform = 'scale(0.95)'; // Görsel feedback
+      e.preventDefault();
+      isTouching = true;
+      elements.sendBtn.style.transform = 'scale(0.95)';
+    }, { passive: false });
+    
+    elements.sendBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      elements.sendBtn.style.transform = '';
+      handleSendButton(e);
+      setTimeout(() => { isTouching = false; }, 300);
     });
     
-    elements.sendBtn.addEventListener('touchend', handleSendButton);
-    
     elements.sendBtn.addEventListener('touchcancel', () => {
-      elements.sendBtn.style.transform = ''; // Reset
+      elements.sendBtn.style.transform = '';
+      isTouching = false;
+    });
+    
+    // Mouse click (desktop) - touch sonrası click'i engelle
+    elements.sendBtn.addEventListener('click', (e) => {
+      if (isTouching) return;
+      handleSendButton(e);
     });
   }
   
@@ -2043,11 +2063,10 @@ function initLangSelector() {
     // Sohbet geçmişini yeniden render et
     if (currentUser) loadChatHistory();
     // Bildirim butonunu güncelle
-    const notifBtn = document.getElementById('notification-toggle');
-    if (notifBtn) {
+    document.querySelectorAll('.notification-toggle-btn').forEach(btn => {
       const enabled = Notification.permission === 'granted';
-      notifBtn.textContent = enabled ? t('notification.on') : t('notification.off');
-    }
+      btn.textContent = enabled ? t('notification.on') : t('notification.off');
+    });
   });
 }
 
@@ -2069,10 +2088,10 @@ async function init() {
   initEventListeners();
   initReminderSettings(); // Hatırlatıcı ayarları
   initProfilePage(); // Profil sayfası
-  initGoogleAuth(); // Google OAuth başlat (bu updateLoginState'i de çağırır)
+  const authLoadedChats = await initGoogleAuth(); // Google OAuth başlat
   
-  // Sadece giriş yapılmışsa sohbetleri yükle
-  if (currentUser) {
+  // Sadece giriş yapılmışsa VE initGoogleAuth içinde yüklenmediyse sohbetleri yükle
+  if (currentUser && !authLoadedChats) {
     try {
       await loadChatHistory();
       await startNewChat();
